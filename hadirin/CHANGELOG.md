@@ -1,0 +1,78 @@
+# Changelog
+
+Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
+
+## [0.6.1] — 2026-11-18
+### Diubah
+- Pendaftaran wajah: cukup 1 klik "Ambil sampel otomatis", 3 sampel diambil sendiri dalam ±3 detik (sebelumnya 5 klik)
+- Catatan lanjutan proyek di `CATATAN-LANJUTAN.md`
+
+## [0.6.0] — 2026-11-18
+### Ditambahkan
+- Menu **Kamera kelas**: absensi scan wajah sungguhan dengan model CNN (face-api.js / TensorFlow.js) yang berjalan di browser
+  - Deteksi wajah TinyFaceDetector, 68 titik wajah, pengenal ResNet-34 (descriptor 128 angka), cocok bila jarak < 0,5 di 3 frame
+  - Cek "hidup": harus berkedip sebelum tercatat hadir, supaya foto di HP tidak bisa dipakai
+  - Siswa yang datang setelah ditandai Alpa otomatis dibatalkan Alpa-nya
+- Pendaftaran wajah 3–5 sampel per siswa dengan catatan persetujuan orang tua (UU PDP); yang disimpan hanya angka ciri wajah, bukan foto
+- Hapus data wajah per siswa, dan reset demo ikut menghapus semua data wajah
+
+## [0.5.0] — 2026-11-18
+### Ditambahkan
+- Database server Supabase (`supabase/migrations/`): laporan, akun, lampiran, dan log tersimpan di server dan sama di semua perangkat
+- Semua kelas punya data siswa sendiri; wali kelas hanya melihat kelasnya, Admin/TU bisa memilih kelas
+- Form orang tua: pilih kelas dulu, link per kelas (`#lapor?k=XI%20IPA%201`)
+- Lampiran tersimpan di server dan bisa dibuka oleh wali kelas/TU (foto otomatis dikecilkan sebelum dikirim)
+- Grafik mingguan dan daftar "perlu perhatian" dihitung dari data nyata 30 hari terakhir
+- Indikator koneksi server, data diperbarui otomatis tiap 20 detik
+
+### Diubah
+- Login, penguncian, hak akses peran, batas kiriman, dan cek NIS sekarang diperiksa di server (fungsi RPC + RLS), bukan di browser
+- Kata sandi di-hash bcrypt di server; token sesi acak 256-bit, kedaluwarsa 15 menit tanpa aktivitas, sesi lain diputus saat ganti sandi
+- Nomor laporan lebih sulit ditebak (`HDR-YYMMDD-ABCDE`), cek status menyamarkan nama anak dan dibatasi 30 pencarian/10 menit
+
+## [0.4.0] — 2026-11-17
+### Ditambahkan
+- Data tersimpan di browser (localStorage): tidak hilang saat refresh, antrean harian dikosongkan saat ganti hari, sinkron antar-tab
+- Sesi login bertahan saat refresh dan berakhir otomatis setelah 15 menit tanpa aktivitas
+- Ganti kata sandi untuk semua akun, wajib ganti saat memakai kata sandi sementara, indikator kekuatan sandi
+- Admin bisa reset kata sandi pengguna, ekspor log audit, dan reset data demo
+- Orang tua bisa cek status laporan dengan nomor laporan (`#cek`)
+- Pencarian siswa di antrean dan laporan, ekspor CSV (Excel) laporan harian dan rekap sekolah, cetak/PDF rekap
+- Pratinjau foto surat, tombol tema terang/gelap/otomatis
+- Build satu file (`node deploy/build-single.js`) dengan CSP berbasis hash + `vercel.json` header keamanan
+
+### Diubah
+- Hash kata sandi: SHA-256 statis → PBKDF2-SHA256 150.000 iterasi dengan salt per akun, perbandingan waktu-konstan
+- Penguncian login bertahap (30 dtk, 60, 120, … maks 15 menit) dan tetap berlaku setelah refresh
+- Form orang tua: status anak baru tampil setelah NIS cocok, honeypot anti-bot, maks 5 laporan/10 menit per perangkat, periode maks 14 hari
+- Lampiran dibatasi JPG/PNG/WEBP/HEIC/PDF maks 5 MB, nama file disanitasi
+- Tampilan login baru (dua kolom), kartu ringkasan berwarna, animasi halus, dialog, mobile lebih rapi
+
+### Diperbaiki
+- Form tidak dikosongkan setelah logout; wali kelas lama bisa diaktifkan lagi padahal kelas sudah punya wali aktif
+- Link `#lapor` tidak terbuka bila ditempel di tab yang sudah terbuka
+
+## [0.3.0] — 2026-10-18
+### Ditambahkan
+- Form lapor sakit/izin untuk orang tua tanpa login (`/#lapor`), dioptimalkan untuk HP
+- Verifikasi 4 digit terakhir NIS, dengan penguncian 60 detik setelah 3 kali salah
+- Nomor laporan untuk orang tua dan pencegahan laporan ganda
+- Antrean "Kabar orang tua" dengan tombol Terima, Terima semua, dan Periksa
+- Paket deploy: config Nginx dengan header keamanan, `setup-vps.sh`, `deploy.sh`, dan Docker
+
+### Diubah
+- Login tidak lagi meminta pilihan peran. Peran dikenali otomatis dari akun
+- Kode dipisah menjadi `index.html`, `style.css`, dan `app.js` supaya CSP bisa ketat
+
+## [0.2.0] — 2026-10-18
+### Ditambahkan
+- Login Admin, TU, dan Guru dengan menu sesuai peran
+- Hash kata sandi, penguncian login, dan log audit
+- Verifikasi surat oleh TU dan rekap kehadiran semua kelas
+- Kelola pengguna dengan kata sandi sementara acak
+
+## [0.1.0] — 2026-10-18
+### Ditambahkan
+- Dashboard pelaporan ketidakhadiran dengan pilihan Sakit/Izin dan keterangan
+- Template keterangan, periode beberapa hari, lampiran surat, dan tandai Alpa sekaligus
+- Grafik mingguan dan daftar siswa yang perlu perhatian

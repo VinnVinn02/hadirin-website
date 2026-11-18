@@ -1,0 +1,14 @@
+services:
+  hadirin:
+    build: .
+    container_name: hadirin
+    restart: unless-stopped
+    # Hanya dibuka ke localhost; arahkan reverse proxy (dengan HTTPS) ke port ini.
+    ports:
+      - "127.0.0.1:8080:80"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true

@@ -1,0 +1,21 @@
+# Sistem
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Rahasia — jangan pernah di-commit
+.env
+*.pem
+*.key
+
+# Hasil kemasan
+*.zip
+
+# Supabase lokal
+supabase/.temp/
+supabase/.branches/
+supabase/db-password.txt

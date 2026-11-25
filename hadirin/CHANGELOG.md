@@ -13,6 +13,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
 - **Kamera kelas:** setiap siswa yang tercatat hadir memunculkan pemberitahuan besar di atas video, misalnya "✓ Bima Saputra hadir" (±3 detik).
   Nama siswa di daftar "Hadir lewat kamera" ditebalkan.
+  Siswa yang sudah tercatat hadir hari ini juga diberi tahu ("✓ Bima · sudah tercatat hadir hari ini"), maksimal sekali per 8 detik.
 
 ### Diperbaiki
 - Teks "Belum ada yang tercatat di sesi ini" di panel kamera tidak lagi terpotong satu kata per baris.

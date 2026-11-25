@@ -666,7 +666,7 @@
      Cocok bila jarak Euclid < 0.5 di 3 frame berturut-turut + terdeteksi kedipan (cek "hidup"). */
   const MATCH=0.5, SAMPLES=3;
   let faces=[], facesSig='', camMode='absen', stream=null, camTimer=null, faceapiP=null, matcher=null;
-  let lastDet=[], samples=[], track=new Map(), camRecent=[], scanBusy=new Set();
+  let lastDet=[], samples=[], track=new Map(), camRecent=[], scanBusy=new Set(), announced=new Map(), loggedSudah=new Set();
   function loadFaceApi(){
     if(faceapiP)return faceapiP;
     faceapiP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='vendor/face-api.js';sc.onload=res;sc.onerror=()=>rej(new Error('Library pengenal wajah gagal dimuat.'));document.head.appendChild(sc);})
@@ -747,7 +747,7 @@
       if(m.label==='unknown')return {txt:'Tidak dikenal',col:'#ef4444'};
       const sid=+m.label, s=byId(sid);seen.add(sid);
       const first=s.name.split(' ')[0];
-      if(hadir.has(sid))return {txt:first+' ✓ hadir',col:'#22c55e'};
+      if(hadir.has(sid)){announceSudah(sid,s.name);return {txt:first+' ✓ hadir',col:'#22c55e'};}
       const e=(ear(d.landmarks.getLeftEye())+ear(d.landmarks.getRightEye()))/2;
       const t=track.get(sid)||{hits:0,max:0,closed:false,blink:false,best:1};
       t.hits++;t.best=Math.min(t.best,m.distance);t.max=Math.max(t.max*0.98,e);
@@ -763,11 +763,20 @@
     scanBusy.add(sid);
     try{
       const r=await authed('hadir_scan',{p_sid:sid,p_jarak:Math.round(d*1000)/1000});
-      hadir.add(sid);
+      hadir.add(sid);announced.set(sid,Date.now());loggedSudah.add(sid);
       camRecent.unshift({t:clock(),name:r.name,m:`hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
       camMsg(`✓ ${r.name} tercatat hadir.`,'ok');camFlash(r.name,r.telat?'hadir · terlambat, Alpa dibatalkan':'hadir');renderKamera();
     }catch(e){camMsg(e.message,'warn');}
     finally{scanBusy.delete(sid);track.delete(sid);}
+  }
+  // Siswa yang SUDAH tercatat hadir hari ini (scan sebelumnya / input lain) tetap diberi tahu,
+  // maksimal sekali per 8 detik per siswa, dan masuk daftar sekali per sesi.
+  function announceSudah(sid,name){
+    const now=Date.now();
+    if(now-(announced.get(sid)||0)<8000)return;
+    announced.set(sid,now);
+    camFlash(name,'sudah tercatat hadir hari ini');
+    if(!loggedSudah.has(sid)){loggedSudah.add(sid);camRecent.unshift({t:clock(),name,m:'sudah tercatat hadir hari ini'});renderKamera();}
   }
   // Pemberitahuan besar di atas video: "✓ Bima hadir" (±3 detik) supaya siswa & guru langsung tahu
   function camFlash(name,sub){

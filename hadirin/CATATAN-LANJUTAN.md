@@ -100,10 +100,10 @@ Kalau yang diubah **database**:
    - Hapus daftar akun demo dari halaman login: variabel `demo` di `app.js` dan `<details>` di `app.html`.
    - Ganti semua sandi demo.
    - Ganti nama sekolah "SMA Harapan Bangsa" di `app.html`.
-2. **Import data siswa asli dari Excel/CSV**. Sekarang siswa dan kelas masih data contoh dari `_seed_dasar()` di SQL.
+2. ~~**Import data siswa asli dari Excel/CSV**~~ — selesai v0.12 (menu Data siswa). Sekarang siswa dan kelas masih data contoh dari `_seed_dasar()` di SQL.
    Perlu menu admin: unggah CSV berisi kolom NIS, nama, kelas.
-3. **Kelola kelas & wali kelas** dari menu admin. Sekarang daftar kelas masih tertulis di kode (`classList` di `app.js` dan tabel `kelas`).
-4. **Matikan data contoh harian**. `_seed_hari()` otomatis mengisi kehadiran dan laporan contoh setiap hari.
+3. ~~**Kelola kelas & wali kelas**~~ — selesai v0.12 (menu Data siswa → Daftar kelas). Sekarang daftar kelas masih tertulis di kode (`classList` di `app.js` dan tabel `kelas`).
+4. ~~**Matikan data contoh harian**~~ — sekarang lewat saklar di menu Data siswa (Admin), tanpa ubah SQL. `_seed_hari()` otomatis mengisi kehadiran dan laporan contoh setiap hari.
    Untuk pemakaian sungguhan, hapus pemanggilan `perform _seed_hari(...)` di fungsi `data_harian` dan `rekap`.
 5. **Notifikasi WhatsApp ke orang tua**. Tombol "Kirim konfirmasi" dan "Ingatkan wali kelas" sekarang hanya mencatat ke log.
    Butuh layanan seperti Fonnte atau WhatsApp Cloud API, lewat Supabase Edge Function supaya API key tidak ada di browser.

@@ -45,7 +45,8 @@
     }catch(_){setSync(false);throw new Error('Tidak bisa terhubung ke server. Periksa koneksi internet.');}
     const txt=await r.text();let data=null;try{data=txt?JSON.parse(txt):null;}catch(_){}
     if(!r.ok){
-      const m=(data&&data.message)||('Server sedang bermasalah ('+r.status+'). Coba lagi.');
+      let m=(data&&data.message)||('Server sedang bermasalah ('+r.status+'). Coba lagi.');
+      if(/Could not find the function|PGRST202/i.test(m)||(data&&data.code==='PGRST202'))m='Fitur ini butuh pembaruan database. Admin: jalankan file migrasi terbaru di Supabase → SQL Editor.';
       if(m==='SESI_HABIS'){sessionGone();throw new Error('Sesi berakhir. Silakan masuk lagi.');}
       setSync(true);throw new Error(m);
     }
@@ -102,20 +103,34 @@
       return {name:safeName(f.name.replace(/\.\w+$/,'')+'.jpg'),mime:'image/jpeg',data:b64(await blob.arrayBuffer())};
     }catch(_){throw new Error('Foto tidak bisa dibaca. Coba foto ulang atau pakai format JPG.');}
   }
+  // Pratinjau lampiran di dalam halaman: foto langsung tampil, PDF lewat tombol buka/unduh.
+  // (Membuka tab baru setelah menunggu server sering diblokir browser sebagai pop-up.)
+  let lampBlob=null, lampUrl='', lampName='';
   async function openLampiran(id){
+    const dlg=$('lampDialog'), view=$('lampView');
+    if(lampUrl){URL.revokeObjectURL(lampUrl);lampUrl='';}
+    lampBlob=null;$('lampTitle').textContent='Lampiran';view.innerHTML='<p class="hint">Memuat lampiran…</p>';
+    $('lampOpen').disabled=$('lampSave').disabled=true;
+    if(!dlg.open)dlg.showModal();
     try{
-      toast('Membuka lampiran…');
       const a=await authed('lampiran_get',{p_id:id});
       const bin=atob(a.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
-      saveBlob(new Blob([u],{type:a.mime}),a.name,true);
-    }catch(e){toast(e.message,'warn');}
+      lampBlob=new Blob([u],{type:a.mime});lampUrl=URL.createObjectURL(lampBlob);lampName=a.name;
+      $('lampTitle').textContent=a.name;
+      if(/^image\//.test(a.mime)){const img=new Image();img.src=lampUrl;img.alt='Lampiran '+a.name;view.replaceChildren(img);}
+      else view.innerHTML=`<div class="empty"><span class="big">📄</span>File PDF. Tekan <b>Buka di tab baru</b> untuk membaca, atau <b>Unduh</b>.</div>`;
+      $('lampOpen').disabled=$('lampSave').disabled=false;
+    }catch(e){view.innerHTML=`<p class="err">${esc(e.message)}</p>`;}
   }
+  $('lampClose').addEventListener('click',()=>$('lampDialog').close());
+  $('lampOpen').addEventListener('click',()=>{if(lampBlob)saveBlob(lampBlob,lampName,true);});
+  $('lampSave').addEventListener('click',()=>{if(lampBlob)saveBlob(lampBlob,lampName,false);});
 
   /* ---------- Akun & peran ---------- */
   const ROLE={admin:'Admin',tu:'TU',guru:'Guru'};
   const demo=[['admin','admin123','admin'],['tu.sari','tu123','tu'],['guru.firman','guru123','guru']];
-  const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],users:['admin']};
-  const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['users','Pengguna']];
+  const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],siswa:['admin','tu'],users:['admin']};
+  const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['siswa','Data siswa'],['users','Pengguna']];
   let session=null, token=null, view='lapor';
 
   function pwProblem(pw,uid){
@@ -277,7 +292,8 @@
         reports=d.reports||[];incoming=d.incoming||[];}).then(()=>authed('wajah_list',{p_kelas:kelas})).then(r=>{setFaces(r||[]);}));
       if(view==='verif')jobs.push(authed('verif_list').then(r=>{vitems=r||[];}));
       if(view==='rekap')jobs.push(authed('rekap').then(r=>{rrows=(r||[]).sort((a,b)=>a[0].localeCompare(b[0],'id',{numeric:true}));}));
-      if(view==='users')jobs.push(authed('users_list').then(r=>{users=r||[];}));
+      if(view==='users')jobs.push(authed('users_list').then(r=>{users=r||[];}),rpc('ortu_kelas').then(r=>{kelasAll=r||[];}));
+      if(view==='siswa')jobs.push(authed('siswa_list',{p_kelas:sKelas||null}).then(r=>{sdata=r;sKelas=r.kelas;}));
       if(!loadedOnce[view]&&!quiet)showLoading();
       await Promise.all(jobs);
       loadedOnce[view]=true;
@@ -292,6 +308,7 @@
     if(view==='verif')$('vbody').innerHTML='<tr><td colspan="6"><div class="empty">Memuat…</div></td></tr>';
     if(view==='rekap')$('rbody').innerHTML='<tr><td colspan="9"><div class="empty">Memuat…</div></td></tr>';
     if(view==='users')$('ubody').innerHTML='<tr><td colspan="6"><div class="empty">Memuat…</div></td></tr>';
+    if(view==='siswa')$('sbody').innerHTML='<tr><td colspan="5"><div class="empty">Memuat…</div></td></tr>';
   }
   // Jalankan aksi ke server dengan tombol dinonaktifkan sementara
   async function act(btn,fn){
@@ -331,7 +348,7 @@
     $('tiles').innerHTML=tiles.map(([l,col,n,note])=>`<div class="tile" style="--accent:${col}"><span class="lbl"><i class="dot" style="background:${col}"></i>${l}</span><span class="num">${n}</span><span class="note">${note}</span></div>`).join('');
   }
   const matchQ=(s,q)=>!q||s.name.toLowerCase().includes(q)||String(s.nis).endsWith(q);
-  const fileBtn=r=>r.file?(r.lampiran?`<button class="linkbtn" type="button" data-lamp="${esc(r.id)}">📎 ${esc(r.file)}</button>`:`📎 ${esc(r.file)}`):'';
+  const fileBtn=r=>r.file?(r.lampiran?`<button class="linkbtn" type="button" data-lamp="${esc(r.id)}">📎 ${esc(r.file)}</button>`:`<span class="sub" title="Data contoh: hanya nama file, tidak ada file yang tersimpan">📎 ${esc(r.file)} · contoh, tanpa file</span>`):'';
   function renderQueue(){
     const all=pending(), q=$('qSearch').value.trim().toLowerCase();
     const list=all.filter(s=>matchQ(s,q)), incs=incoming.filter(r=>matchQ(byId(r.sid),q));
@@ -615,10 +632,12 @@
     toast(n?`Pengingat dicatat untuk ${n} wali kelas.`:'Semua kelas sudah lengkap.');refresh(true);});
 
   /* ---------- Pengguna (Admin) ---------- */
-  const classList=['X-1','X-3','XI IPA 1','XI IPA 2','XI IPS 1','XII IPA 1','XII IPS 2'];
-  $('nKelas').innerHTML+=classList.map(k=>`<option>${k}</option>`).join('');
+  let kelasAll=[];
   $('nRole').addEventListener('change',e=>{$('nKelas').disabled=e.target.value!=='guru';if(e.target.value!=='guru')$('nKelas').value='';});
   function renderUsers(){
+    const nk=$('nKelas'), cur=nk.value;
+    nk.innerHTML='<option value="">Bukan wali kelas</option>'+kelasAll.map(k=>`<option>${esc(k)}</option>`).join('');
+    if(kelasAll.includes(cur))nk.value=cur;
     $('ubody').innerHTML=users.map(u=>`<tr>
       <td><b>${esc(u.name)}</b><div class="sub mono">${esc(u.u)}</div></td>
       <td><span class="pill ${esc(u.role)}">${ROLE[u.role]}</span></td>
@@ -659,6 +678,155 @@
     let res;try{res=await authed('user_buat',{p_nama:name,p_uid:u,p_role:role,p_kelas:k});}catch(ex){return fail(ex.message);}
     $('newPw').hidden=false;$('newPw').innerHTML=`Akun <b>${esc(res.u)}</b> dibuat. Kata sandi sementara: <span class="mono"><b>${esc(res.temp)}</b></span><br><span class="hint">Hanya ditampilkan sekali. Pengguna wajib menggantinya saat login pertama.</span>`;
     $('nName').value='';$('nUser').value='';refresh(true);
+  });
+
+  /* ---------- Data siswa & kelas (Admin + TU) ---------- */
+  let sdata=null, sKelas='', sEdit=null, impRows=[], impHeader=0;
+  const hpTampil=h=>h?('0'+String(h).slice(2)).replace(/(\d{4})(\d{4})(\d+)/,'$1 $2 $3'):'';
+  function renderSiswa(){
+    if(!sdata)return;
+    const kl=sdata.kelasList||[], q=$('sCari').value.trim().toLowerCase();
+    $('sTotal').textContent=`${sdata.total} siswa`;$('sKelasN').textContent=`${kl.length} kelas`;
+    const opts=kl.map(k=>`<option value="${esc(k.id)}">${esc(k.id)} (${k.n})</option>`).join('');
+    $('sKelas').innerHTML=opts;$('sKelas').value=sKelas;
+    const fk=$('sfKelas').value;$('sfKelas').innerHTML=kl.map(k=>`<option value="${esc(k.id)}">${esc(k.id)}</option>`).join('');
+    $('sfKelas').value=sEdit?sEdit.kelas:(kl.some(k=>k.id===fk)?fk:sKelas);
+    const list=(sdata.siswa||[]).filter(s=>!q||s.name.toLowerCase().includes(q)||s.nis.toLowerCase().includes(q));
+    $('sbody').innerHTML=list.length?list.map(s=>`<tr>
+      <td class="mono">${esc(s.nis)}</td><td><b>${esc(s.name)}</b></td>
+      <td class="mono">${s.hp?esc(hpTampil(s.hp)):'<span class="sub">–</span>'}</td>
+      <td>${s.wajah?'<span class="pill hadir">Terdaftar</span>':'<span class="pill wait">Belum</span>'}</td>
+      <td style="white-space:nowrap"><span style="display:flex;gap:6px"><button class="btn small" type="button" data-sedit="${s.id}">Ubah</button><button class="btn small danger" type="button" data-sdel="${s.id}">Hapus</button></span></td></tr>`).join('')
+      :`<tr><td colspan="5"><div class="empty">${q?'Tidak ada siswa yang cocok.':'Belum ada siswa di kelas ini. Tambahkan lewat form atau impor dari Excel.'}</div></td></tr>`;
+    $('kbody').innerHTML=kl.map(k=>`<tr><td><b>${esc(k.id)}</b></td>
+      <td>${k.wali?esc(k.wali):'<span class="sub">–</span>'}${k.guru?`<div class="sub">Akun: ${esc(k.guru)}</div>`:''}</td>
+      <td class="num">${k.n}</td>
+      <td style="white-space:nowrap"><span style="display:flex;gap:6px;justify-content:flex-end"><button class="btn small" type="button" data-kwali="${esc(k.id)}">Ubah wali</button>${k.n||k.guru?'':`<button class="btn small danger" type="button" data-kdel="${esc(k.id)}">Hapus</button>`}</span></td></tr>`).join('');
+    const isAdmin=session&&session.role==='admin';
+    $('demoPanel').hidden=!isAdmin;$('sDemo').hidden=!sdata.demo;$('sDemo').textContent='Data contoh harian: aktif';
+    $('demoText').innerHTML=sdata.demo
+      ?'<b>Aktif.</b> Setiap hari server mengisi kehadiran dan laporan contoh secara otomatis, jadi sebagian besar siswa langsung tercatat hadir sebelum discan. Matikan saat sekolah mulai memakai Hadirin sungguhan.'
+      :'<b>Mati.</b> Kehadiran hanya tercatat dari scan wajah dan input guru. Laporan contoh tidak dibuat lagi.';
+    $('demoToggle').textContent=sdata.demo?'Matikan data contoh':'Nyalakan data contoh';
+    $('demoToggle').className='btn '+(sdata.demo?'danger':'');
+  }
+  function resetSiswaForm(){
+    sEdit=null;$('sfNis').value='';$('sfNama').value='';$('sfHp').value='';$('sfErr').hidden=true;
+    $('sfEyebrow').textContent='Siswa baru';$('sfTitle').textContent='Tambah siswa';$('sfBatal').hidden=true;$('sfSimpan').textContent='Simpan siswa';
+    $('sfKelas').value=sKelas;
+  }
+  $('sKelas').addEventListener('change',e=>{sKelas=e.target.value;$('sCari').value='';if(!sEdit)$('sfKelas').value=sKelas;refresh();});
+  $('sCari').addEventListener('input',renderSiswa);
+  $('sfBatal').addEventListener('click',resetSiswaForm);
+  $('sbody').addEventListener('click',async e=>{
+    const b=e.target.closest('button');if(!b||!sdata)return;
+    const s=(sdata.siswa||[]).find(x=>String(x.id)===(b.dataset.sedit||b.dataset.sdel));if(!s)return;
+    if(b.dataset.sedit){sEdit=s;$('sfNis').value=s.nis;$('sfNama').value=s.name;$('sfKelas').value=s.kelas;$('sfHp').value=hpTampil(s.hp);
+      $('sfEyebrow').textContent='Ubah data';$('sfTitle').textContent=s.name;$('sfBatal').hidden=false;$('sfSimpan').textContent='Simpan perubahan';$('sfErr').hidden=true;
+      $('siswaForm').scrollIntoView({behavior:'smooth',block:'center'});$('sfNama').focus({preventScroll:true});return;}
+    if(!confirm(`Hapus ${s.name} (NIS ${s.nis})?\n\nSemua laporan, lampiran, data wajah, dan riwayat kehadiran siswa ini ikut terhapus dan tidak bisa dikembalikan.`))return;
+    const ok=await act(b,()=>authed('siswa_hapus',{p_id:s.id}).then(()=>true));
+    if(ok){if(sEdit&&sEdit.id===s.id)resetSiswaForm();toast(`${s.name} dihapus.`);refresh(true);}
+  });
+  $('siswaForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const fail=m=>{$('sfErr').textContent=m;$('sfErr').hidden=false;};
+    const nis=$('sfNis').value.trim(), nama=$('sfNama').value.trim(), k=$('sfKelas').value, hp=$('sfHp').value.trim();
+    if(nis.length<3)return fail('Isi NIS (minimal 3 karakter).');
+    if(nama.length<2)return fail('Isi nama lengkap siswa.');
+    if(!k)return fail('Pilih kelas. Kalau belum ada, tambahkan kelasnya dulu di daftar kelas.');
+    $('sfErr').hidden=true;
+    const r=await act($('sfSimpan'),()=>authed('siswa_simpan',{p_id:sEdit?sEdit.id:null,p_nis:nis,p_nama:nama,p_kelas:k,p_hp:hp||null}).catch(ex=>{fail(ex.message);return null;}));
+    if(!r)return;
+    toast(sEdit?`Data ${r.name} disimpan.`:`${r.name} ditambahkan ke ${r.kelas}.`,'ok');
+    sKelas=r.kelas;resetSiswaForm();refresh(true);
+  });
+
+  // ---- Impor CSV (dari Excel). Pemisah ; atau , dideteksi otomatis.
+  function parseCSV(text){
+    text=text.replace(/^\uFEFF/,'');
+    const first=text.split(/\r?\n/)[0]||'';
+    const sep=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?';':(first.includes('\t')&&!first.includes(',')?'\t':',');
+    const rows=[];let row=[],f='',q=false;
+    for(let i=0;i<text.length;i++){const c=text[i];
+      if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+      else if(c==='"')q=true;
+      else if(c===sep){row.push(f);f='';}
+      else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f='';}
+      else f+=c;}
+    if(f!==''||row.length){row.push(f);rows.push(row);}
+    return rows.filter(r=>r.some(c=>c.trim()!==''));
+  }
+  function csvToSiswa(rows){
+    if(!rows.length)return [];
+    const h=rows[0].map(c=>c.trim().toLowerCase());
+    const find=re=>h.findIndex(c=>re.test(c));
+    let iN=find(/^nis\b|induk/), iNm=find(/^nama/), iK=find(/^kelas|rombel/), iH=find(/wa|hp|telep|telp|no\.? ?(ortu|orang)/);
+    let data=rows;
+    impHeader=0;
+    if(iN>=0&&iNm>=0&&iK>=0){data=rows.slice(1);impHeader=1;}else{iN=0;iNm=1;iK=2;iH=3;}
+    return data.map(r=>({nis:(r[iN]||'').trim(),nama:(r[iNm]||'').trim(),kelas:(r[iK]||'').trim(),hp:iH>=0?(r[iH]||'').trim():''}));
+  }
+  $('impTemplate').addEventListener('click',()=>{
+    const csv='\uFEFFNIS;Nama;Kelas;No WA Ortu\r\n2301101;Contoh Nama Siswa;XI IPA 1;081234567890\r\n';
+    saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),'template-data-siswa.csv',false);
+  });
+  $('impFile').addEventListener('change',async e=>{
+    const f=e.target.files[0];impRows=[];$('impErr').hidden=true;$('impHasil').hidden=true;$('impInfo').hidden=true;$('impKirim').disabled=true;
+    if(!f)return;
+    if(f.size>2e6){$('impErr').textContent='File terlalu besar (maks 2 MB).';$('impErr').hidden=false;return;}
+    if(/\.xlsx?$/i.test(f.name)){$('impErr').textContent='File Excel (.xlsx) belum bisa dibaca langsung. Di Excel pilih File → Save As → CSV, lalu pilih file CSV-nya.';$('impErr').hidden=false;return;}
+    try{impRows=csvToSiswa(parseCSV(await f.text()));}catch(_){impRows=[];}
+    if(!impRows.length){$('impErr').textContent='Tidak ada baris data yang terbaca. Pastikan kolomnya NIS, Nama, Kelas.';$('impErr').hidden=false;return;}
+    if(impRows.length>3000){$('impErr').textContent=`Ada ${impRows.length} baris. Maksimal 3000 sekali impor, pecah file menjadi beberapa bagian.`;$('impErr').hidden=false;impRows=[];return;}
+    const kls=new Set(impRows.map(r=>r.kelas.toLowerCase()).filter(Boolean));
+    $('impInfo').innerHTML=`Terbaca <b>${impRows.length}</b> siswa di <b>${kls.size}</b> kelas. Contoh baris pertama: <span class="mono">${esc(impRows[0].nis)} · ${esc(impRows[0].nama)} · ${esc(impRows[0].kelas)}</span>`;
+    $('impInfo').hidden=false;$('impKirim').disabled=false;
+  });
+  $('impKirim').addEventListener('click',async e=>{
+    if(!impRows.length)return;
+    const r=await act(e.currentTarget,()=>authed('siswa_impor',{p_rows:impRows,p_buat_kelas:$('impBuatKelas').checked}).catch(ex=>{$('impErr').textContent=ex.message;$('impErr').hidden=false;return null;}));
+    if(!r)return;
+    const skip=(r.dilewati||[]).map(x=>`<li>Baris ${x.baris+impHeader}${x.nis?' (NIS '+esc(x.nis)+')':''}: ${esc(x.alasan)}</li>`).join('');
+    $('impHasil').innerHTML=`Selesai: <b>${r.baru}</b> siswa baru, <b>${r.diubah}</b> diperbarui${r.kelasBaru?`, <b>${r.kelasBaru}</b> kelas baru`:''}.`
+      +(r.jumlahDilewati?`<br><b>${r.jumlahDilewati}</b> baris dilewati${r.jumlahDilewati>50?' (50 pertama ditampilkan)':''}:<ul class="imp-skip">${skip}</ul>`:'');
+    $('impHasil').hidden=false;$('impErr').hidden=true;$('impFile').value='';impRows=[];$('impKirim').disabled=true;$('impInfo').hidden=true;
+    toast('Impor data siswa selesai.','ok');refresh(true);
+  });
+
+  // ---- Kelas
+  $('kelasForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const nama=$('kfNama').value.trim(), wali=$('kfWali').value.trim();
+    const fail=m=>{$('kfErr').textContent=m;$('kfErr').hidden=false;};
+    if(!nama)return fail('Isi nama kelas, misalnya X-2 atau XI IPA 3.');
+    $('kfErr').hidden=true;
+    const ok=await act(e.submitter,()=>authed('kelas_simpan',{p_id:nama,p_wali:wali,p_baru:true}).then(()=>true).catch(ex=>{fail(ex.message);return false;}));
+    if(!ok)return;
+    toast(`Kelas ${nama} ditambahkan.`,'ok');$('kfNama').value='';$('kfWali').value='';sKelas=nama;refresh(true);
+  });
+  $('kbody').addEventListener('click',async e=>{
+    const b=e.target.closest('button');if(!b||!sdata)return;
+    if(b.dataset.kwali){const k=sdata.kelasList.find(x=>x.id===b.dataset.kwali);
+      const w=prompt(`Nama wali kelas ${k.id}:`,k.wali||'');if(w===null)return;
+      const ok=await act(b,()=>authed('kelas_simpan',{p_id:k.id,p_wali:w,p_baru:false}).then(()=>true));
+      if(ok){toast(`Wali kelas ${k.id} disimpan.`,'ok');refresh(true);}return;}
+    if(b.dataset.kdel){const id=b.dataset.kdel;if(!confirm(`Hapus kelas ${id}? Kelas ini sudah kosong.`))return;
+      const ok=await act(b,()=>authed('kelas_hapus',{p_id:id}).then(()=>true));
+      if(ok){if(sKelas===id)sKelas='';toast(`Kelas ${id} dihapus.`);refresh(true);}}
+  });
+
+  // ---- Saklar data contoh (Admin)
+  $('demoToggle').addEventListener('click',async e=>{
+    if(!sdata)return;
+    const nyalakan=!sdata.demo;let kosong=false;
+    if(!nyalakan){
+      if(!confirm('Matikan data contoh harian?\n\nMulai sekarang kehadiran hanya tercatat dari scan wajah dan input guru.'))return;
+      kosong=confirm('Kosongkan juga kehadiran HARI INI?\n\nPilih OK supaya semua siswa mulai dari "belum hadir" dan scan wajah langsung mencatat. Kehadiran hasil scan hari ini juga ikut terhapus.');
+    }
+    const r=await act(e.currentTarget,()=>authed('data_contoh_set',{p_aktif:nyalakan,p_kosongkan:kosong}));
+    if(!r)return;
+    toast(nyalakan?'Data contoh harian dinyalakan.':`Data contoh dimatikan${r.dihapus?`, ${r.dihapus} kehadiran hari ini dikosongkan`:''}.`,'ok');refresh(true);
   });
 
   /* ---------- Kamera kelas: scan wajah (face-api.js / TensorFlow.js, model CNN) ----------
@@ -864,6 +1032,7 @@
     if(view==='verif')renderVerif();
     if(view==='rekap')renderRekap();
     if(view==='users')renderUsers();
+    if(view==='siswa')renderSiswa();
     renderLog();
   }
 

@@ -445,6 +445,81 @@
       </div>
     </section>
 
+    <!-- ===== Data siswa & kelas (Admin + TU) ===== -->
+    <section class="view" id="v-siswa" hidden>
+      <div>
+        <div class="eyebrow">Data sekolah</div>
+        <h1>Data siswa dan kelas</h1>
+        <p class="lead">Tambah, ubah, atau hapus siswa satu per satu, atau impor sekaligus dari Excel. Perubahan langsung dipakai di pelaporan, kamera, dan form orang tua.</p>
+        <div class="meta" style="margin-top:10px"><span id="sTotal">0 siswa</span><span id="sKelasN">0 kelas</span><span id="sDemo" hidden></span></div>
+      </div>
+      <div class="grid3">
+        <div class="panel">
+          <div class="panel-head">
+            <div><div class="eyebrow">Siswa</div><h2>Daftar siswa per kelas</h2></div>
+            <label class="kelassel">Kelas <select id="sKelas" aria-label="Pilih kelas"></select></label>
+          </div>
+          <input type="search" id="sCari" placeholder="Cari nama atau NIS di kelas ini" aria-label="Cari siswa">
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>NIS</th><th>Nama</th><th>No. WA ortu</th><th>Wajah</th><th></th></tr></thead>
+              <tbody id="sbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <form class="panel" id="siswaForm" novalidate>
+          <div><div class="eyebrow" id="sfEyebrow">Siswa baru</div><h2 id="sfTitle">Tambah siswa</h2></div>
+          <div class="field"><label for="sfNis">NIS</label><input type="text" id="sfNis" maxlength="20" inputmode="numeric" autocomplete="off" placeholder="Contoh: 2301101"></div>
+          <div class="field"><label for="sfNama">Nama lengkap</label><input type="text" id="sfNama" maxlength="80" autocomplete="off" placeholder="Contoh: Bima Pratama"></div>
+          <div class="row2">
+            <div class="field"><label for="sfKelas">Kelas</label><select id="sfKelas"></select></div>
+            <div class="field"><label for="sfHp">No. WA orang tua <span class="sub">(opsional)</span></label><input type="tel" id="sfHp" maxlength="20" inputmode="tel" autocomplete="off" placeholder="0812 3456 7890"></div>
+          </div>
+          <p class="err" id="sfErr" hidden role="alert"></p>
+          <div class="actions"><button class="btn" type="button" id="sfBatal" hidden>Batal ubah</button><button class="btn primary" type="submit" id="sfSimpan">Simpan siswa</button></div>
+        </form>
+      </div>
+
+      <div class="grid3">
+        <div class="panel">
+          <div><div class="eyebrow">Impor</div><h2>Impor banyak siswa dari Excel</h2></div>
+          <ol class="hint steps-sm">
+            <li>Unduh template, lalu isi di Excel: kolom <b>NIS</b>, <b>Nama</b>, <b>Kelas</b>, dan <b>No WA Ortu</b> (boleh kosong).</li>
+            <li>Simpan sebagai <b>CSV</b> (File → Save As → CSV).</li>
+            <li>Pilih file di bawah. NIS yang sudah ada akan diperbarui, bukan dobel.</li>
+          </ol>
+          <div class="actions" style="justify-content:flex-start"><button class="btn small" type="button" id="impTemplate">⬇ Unduh template</button></div>
+          <div class="field"><label for="impFile">File CSV</label><input type="file" id="impFile" accept=".csv,text/csv"></div>
+          <label class="toggle"><input type="checkbox" id="impBuatKelas"> Buat otomatis kelas yang belum ada</label>
+          <p class="hint" id="impInfo" hidden></p>
+          <p class="err" id="impErr" hidden role="alert"></p>
+          <div class="newpw" id="impHasil" hidden></div>
+          <div class="actions"><button class="btn primary" type="button" id="impKirim" disabled>Impor</button></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="eyebrow">Kelas</div><h2>Daftar kelas</h2></div></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Kelas</th><th>Wali kelas</th><th class="num">Siswa</th><th></th></tr></thead>
+              <tbody id="kbody"></tbody>
+            </table>
+          </div>
+          <form class="row2" id="kelasForm" novalidate style="align-items:end">
+            <div class="field"><label for="kfNama">Kelas baru</label><input type="text" id="kfNama" maxlength="20" placeholder="Contoh: X-2"></div>
+            <div class="field"><label for="kfWali">Nama wali kelas</label><input type="text" id="kfWali" maxlength="80" placeholder="Contoh: Rina Kartika, S.Pd."></div>
+            <p class="err" id="kfErr" hidden role="alert" style="grid-column:1/-1"></p>
+            <div class="actions" style="grid-column:1/-1"><button class="btn" type="submit">＋ Tambah kelas</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel danger-zone" id="demoPanel" hidden>
+        <div><div class="eyebrow">Data contoh</div><h2>Data contoh harian</h2></div>
+        <p class="hint" style="margin:0" id="demoText"></p>
+        <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" id="demoToggle"></button></div>
+      </div>
+    </section>
+
     <!-- ===== Pengguna (Admin) ===== -->
     <section class="view" id="v-users" hidden>
       <div>
@@ -531,6 +606,15 @@
     <p class="err" id="hpErr" hidden role="alert"></p>
     <div class="actions"><button class="btn" type="button" id="hpCancel">Batal</button><button class="btn" type="button" id="hpClear">Hapus nomor</button><button class="btn primary" type="submit" id="hpSave">Simpan</button></div>
   </form>
+</dialog>
+
+<dialog id="lampDialog" class="wide" aria-labelledby="lampTitle">
+  <div class="dform">
+    <div class="panel-head"><div><div class="eyebrow">Lampiran surat</div><h2 id="lampTitle">Lampiran</h2></div>
+      <button class="btn small" type="button" id="lampClose">Tutup</button></div>
+    <div class="lampview" id="lampView"><p class="hint">Memuat lampiran…</p></div>
+    <div class="actions"><button class="btn" type="button" id="lampOpen">↗ Buka di tab baru</button><button class="btn" type="button" id="lampSave">⬇ Unduh</button></div>
+  </div>
 </dialog>
 
 <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>

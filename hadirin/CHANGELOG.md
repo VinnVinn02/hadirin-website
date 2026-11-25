@@ -2,6 +2,19 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.12.0] — 2026-11-26
+### Ditambahkan
+- **Menu Data siswa** (Admin + TU): tambah, ubah, hapus siswa (NIS, nama, kelas, no. WA ortu), cari per kelas,
+  status pendaftaran wajah.
+- **Impor dari Excel (CSV)**: template unduhan, pemisah `;`/`,` dideteksi otomatis, NIS yang sudah ada diperbarui (tidak dobel),
+  opsi membuat kelas baru otomatis, baris yang salah dilewati dan dilaporkan.
+- **Kelola kelas**: tambah kelas, ubah nama wali kelas, hapus kelas kosong. Pilihan kelas di form akun guru kini diambil dari database.
+- **Saklar data contoh harian** (Admin): matikan supaya kehadiran tidak lagi diisi otomatis, dengan opsi mengosongkan kehadiran hari ini.
+- **Pratinjau lampiran** di dalam halaman: foto surat langsung tampil, PDF bisa dibuka/diunduh.
+  Lampiran data contoh ditandai "contoh, tanpa file".
+- Migrasi `20261126000000_data-siswa.sql`: RPC `siswa_list`, `siswa_simpan`, `siswa_hapus`, `siswa_impor`,
+  `kelas_simpan`, `kelas_hapus`, `data_contoh_set`; tabel `pengaturan`.
+
 ## [0.11.0] — 2026-11-26
 ### Ditambahkan
 - **Halaman depan publik** di `/` (`public/index.html`): satu H1, meta description, canonical, Open Graph + Twitter Card,

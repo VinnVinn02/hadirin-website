@@ -2,6 +2,43 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.11.0] — 2026-11-26
+### Ditambahkan
+- **Halaman depan publik** di `/` (`public/index.html`): satu H1, meta description, canonical, Open Graph + Twitter Card,
+  gambar pratinjau 1200×630 (`assets/og-image.png`, dibuat ulang dengan `node deploy/make-og.js`),
+  JSON-LD (Organization, WebSite, SoftwareApplication, FAQPage), bagian cara kerja, fitur, keamanan data, tanya jawab, dan kontak.
+- `robots.txt` dan `sitemap.xml`.
+- Build menolak jalan selama halaman depan masih berisi `GANTI:` (tes lokal: `HADIRIN_DRAFT=1`).
+  Bagian kontak sementara diganti tombol "Mulai memakai Hadirin" sampai data kontak asli tersedia.
+
+### Diubah
+- Aplikasi pindah ke `/app` (`public/app.html`). Link lama `/#lapor`, `/#lapor?k=…`, dan `/#cek` diteruskan otomatis ke `/app`.
+- `X-Robots-Tag: noindex` sekarang hanya untuk `/app`, `/models`, dan `/vendor`; halaman depan boleh diindeks (Vercel dan Nginx).
+
+## [0.10.0] — 2026-11-19
+### Ditambahkan
+- Enkripsi descriptor wajah saat disimpan: AES-256 (pgcrypto) dengan kunci di Supabase Vault.
+  Enkripsi/dekripsi terjadi di server, sehingga kode front-end tidak berubah.
+
+## [0.9.0] — 2026-11-19
+### Diubah
+- Ambang kecocokan wajah diseragamkan: server menolak jarak > 0.5 (sebelumnya 0.6) dan nilai NaN.
+
+### Ditambahkan
+- Validasi *magic bytes* lampiran di server — isi file harus benar-benar JPG/PNG/WEBP/PDF, bukan sekadar MIME/ekstensi palsu.
+- Fungsi retensi & penghapusan data (UU PDP): `siswa_hapus_data`, `retensi_bersihkan`, `hapus_lampiran_yatim`.
+- Pengujian SQL di `supabase/tests/` (`01_hardening_test.sql`, `02_enkripsi_test.sql`).
+
+## [0.7.0] — 2026-11-18
+### Ditambahkan
+- Tombol **💬 WA ortu** (lewat `wa.me`): membuka WhatsApp di perangkat guru dengan pesan yang sudah terisi, guru tinggal menekan Kirim
+  - Ada di form laporan (saat siswa dipilih dari antrean), tabel laporan hari ini, dan daftar "Perlu perhatian"
+  - Pesan menyesuaikan keadaan: belum ada kabar (plus link form orang tua), Alpa, konfirmasi Sakit/Izin, dan rekap kehadiran
+  - Pesan menyertakan total **hari** tidak masuk dalam 30 hari terakhir (minimal 2 hari)
+- Nomor WA orang tua per siswa (`siswa.hp_ortu`), diisi lewat tombol **＋ No. WA**. Guru hanya bisa melihat dan mengubah nomor siswa di kelasnya sendiri
+- Setiap pembukaan WA dan perubahan nomor dicatat di log audit
+- Migrasi `20261118020000_wa-ortu.sql`: RPC `kontak_ortu`, `hp_ortu_set`, `wa_catat`
+
 ## [0.6.1] — 2026-11-18
 ### Diubah
 - Pendaftaran wajah: cukup 1 klik "Ambil sampel otomatis", 3 sampel diambil sendiri dalam ±3 detik (sebelumnya 5 klik)

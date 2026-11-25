@@ -24,7 +24,7 @@ antrean laporan untuk wali kelas, verifikasi surat oleh TU, rekap sekolah, dan k
 ## Fitur
 
 ### Form lapor orang tua (tanpa login)
-- Dibuka dari link yang dibagikan wali kelas di grup WhatsApp: `https://domainanda/#lapor`
+- Dibuka dari link yang dibagikan wali kelas di grup WhatsApp: `https://domainanda/app#lapor` (link lama `https://domainanda/#lapor` tetap diteruskan otomatis)
 - Tujuh langkah singkat:
   1. Nama anak
   2. 4 angka terakhir NIS
@@ -103,7 +103,8 @@ Siswa lain yang belum hadir: Lutfi Hakim (`1112`) dan Naufal Rizky (`1114`).
 ```
 hadirin/
 ├── public/                  # Semua file yang di-upload ke server
-│   ├── index.html           # Halaman (login, form orang tua, dashboard)
+│   ├── index.html           # Halaman depan publik (profil produk, boleh diindeks Google)
+│   ├── app.html             # Aplikasi (login, form orang tua, dashboard), tidak diindeks
 │   └── assets/
 │       ├── css/style.css    # Tampilan (mode terang dan gelap)
 │       ├── js/app.js        # Logika aplikasi
@@ -137,9 +138,9 @@ cd hadirin/public && python3 -m http.server 8000
 npx serve hadirin/public -l 8000
 ```
 
-Lalu buka `http://localhost:8000`, dan untuk form orang tua `http://localhost:8000/#lapor`.
+Lalu buka `http://localhost:8000` (halaman depan), `http://localhost:8000/app.html` (aplikasi), dan untuk form orang tua `http://localhost:8000/app.html#lapor`.
 
-> Jangan membuka `index.html` dengan klik dua kali (`file://`). Fitur seperti hash kata sandi (`crypto.subtle`) hanya berjalan di `http://localhost` atau `https://`.
+> Jangan membuka `app.html` dengan klik dua kali (`file://`). Fitur seperti hash kata sandi (`crypto.subtle`) hanya berjalan di `http://localhost` atau `https://`.
 
 ---
 
@@ -153,7 +154,7 @@ Ringkasnya:
    ```bash
    sudo bash deploy/setup-vps.sh domainanda.com email@anda.com
    ```
-4. Buka `https://domainanda.com`.
+4. Buka `https://domainanda.com` (halaman depan) dan `https://domainanda.com/app` (aplikasi).
 
 Untuk update berikutnya, jalankan dari laptop:
 

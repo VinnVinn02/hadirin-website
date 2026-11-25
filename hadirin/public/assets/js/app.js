@@ -259,7 +259,7 @@
 
   /* ---------- Data dari server ---------- */
   let students=[], hadir=new Set(), reports=[], incoming=[], kelas='', kelasList=[], chart=[], watch=[], log=[];
-  let users=[], vitems=[], rrows=[], poller=null, busyRefresh=false, loadedOnce={};
+  let users=[], vitems=[], rrows=[], poller=null, busyRefresh=false, loadedOnce={}, kontak=new Map();
   const byId=id=>students.find(s=>s.id===id)||{id,name:'(siswa)',nis:'-'};
   const LBL={sakit:'Sakit',izin:'Izin',alpa:'Alpa'};
 
@@ -270,7 +270,8 @@
       const jobs=[authed('log_list').then(r=>{log=r||[];})];
       if(view==='lapor')jobs.push(authed('data_harian',{p_kelas:kelas||null}).then(d=>{
         todayISO=d.hari||todayISO;kelas=d.kelas;kelasList=d.kelasList||[];students=d.siswa||[];hadir=new Set(d.hadir||[]);
-        reports=d.reports||[];incoming=d.incoming||[];chart=d.chart||[];watch=d.watch||[];wali=d.wali||'';}));
+        reports=d.reports||[];incoming=d.incoming||[];chart=d.chart||[];watch=d.watch||[];wali=d.wali||'';})
+        .then(()=>authed('kontak_ortu',{p_kelas:kelas}).then(r=>{kontak=new Map((r||[]).map(c=>[c.sid,c]));},()=>{kontak=new Map();})));
       if(view==='kamera')jobs.push(authed('data_harian',{p_kelas:kelas||null}).then(d=>{
         todayISO=d.hari||todayISO;kelas=d.kelas;kelasList=d.kelasList||[];students=d.siswa||[];hadir=new Set(d.hadir||[]);
         reports=d.reports||[];incoming=d.incoming||[];}).then(()=>authed('wajah_list',{p_kelas:kelas})).then(r=>{setFaces(r||[]);}));
@@ -364,7 +365,7 @@
       <td><div class="ket">${esc(r.ket)||'<span class="sub">Tidak ada kabar sampai batas jam lapor</span>'}</div>${r.file?`<div class="sub">Lampiran: ${fileBtn(r)} · ${verifPill(r.verif)}</div>`:''}${r.verif==='ditolak'&&r.alasan?`<div class="sub">Alasan TU: ${esc(r.alasan)}</div>`:''}</td>
       <td class="mono">${per}</td>
       <td><div>${esc(r.pelapor)}</div><div class="sub mono">${esc(r.jam)}${r.oleh?' · '+esc(r.oleh):''}</div></td>
-      <td style="white-space:nowrap">${r.jenis==='alpa'&&false?'':`<button class="btn small" type="button" data-edit="${esc(r.id)}">Ubah</button>`}</td></tr>`;}).join('');
+      <td style="white-space:nowrap">${waBtn(r.sid,r.jenis,r.id)} <button class="btn small" type="button" data-edit="${esc(r.id)}">Ubah</button></td></tr>`;}).join('');
   }
   function renderChart(){
     const days=['Sen','Sel','Rab','Kam','Jum'];
@@ -385,7 +386,8 @@
   function renderWatch(){
     if(!watch.length){$('watch').innerHTML='<li class="empty">Belum ada siswa dengan 2 kali atau lebih tidak hadir dalam 30 hari terakhir.</li>';return;}
     $('watch').innerHTML=watch.map(w=>{const parts=[['sakit','Sakit'],['izin','Izin'],['alpa','Alpa']].filter(([k])=>+w[k]>0).map(([k,l])=>`${w[k]}× ${l}`);
-      return `<li><b>${esc(w.name)}</b><span class="pill ${esc(w.jenis)}">${w.n}× tidak hadir</span><span class="why">${parts.join(', ')} dalam 30 hari terakhir.${+w.alpa>=2?' Pertimbangkan panggilan orang tua.':''}</span></li>`;}).join('');
+      const s=students.find(x=>x.name===w.name);
+      return `<li><b>${esc(w.name)}</b><span class="pill ${esc(w.jenis)}">${w.n}× tidak hadir</span><span class="why">${parts.join(', ')} dalam 30 hari terakhir.${+w.alpa>=2?' Pertimbangkan panggilan orang tua.':''}</span>${s?`<span class="why">${waBtn(s.id,'rekap')}</span>`:''}</li>`;}).join('');
   }
   function renderChips(){
     const j=document.querySelector('input[name=jenis]:checked');
@@ -404,7 +406,8 @@
     selected=sid;editing=rec||null;const s=byId(sid);
     $('formTitle').textContent=mode==='periksa'?'Periksa laporan dari orang tua':mode==='ubah'?'Ubah laporan':'Laporkan ketidakhadiran';
     $('who').hidden=false;
-    $('who').innerHTML=`<span class="av">${initials(s.name)}</span><span><b>${esc(s.name)}</b><span class="hint">NIS ${esc(s.nis)} · ${esc(kelas)}</span></span>`;
+    $('who').innerHTML=`<span class="av">${initials(s.name)}</span><span style="min-width:0;flex:1"><b>${esc(s.name)}</b><span class="hint">NIS ${esc(s.nis)} · ${esc(kelas)}</span></span>
+      <span class="waact" data-k="${rec?esc(rec.jenis):'belum'}" data-r="${rec?esc(rec.id):''}">${waBtn(sid,rec?rec.jenis:'belum',rec&&rec.id)}</span>`;
     resetForm();
     if(rec){
       if(rec.jenis!=='alpa')document.querySelector(`input[name=jenis][value=${rec.jenis}]`).checked=true;
@@ -421,6 +424,79 @@
     if(ids.includes(editing&&editing.id))clearSelection();
     toast(n===1?'Laporan orang tua diterima.':`${n} laporan orang tua diterima.`,'ok');refresh(true);
   }
+  /* ---------- WhatsApp ke orang tua (wa.me, dikirim manual oleh guru) ---------- */
+  const SEKOLAH='SMA Harapan Bangsa';
+  // Tombol: jika nomor sudah ada -> "WA ortu"; jika belum -> "Isi no. WA"
+  function waBtn(sid,kind,rid){
+    const c=kontak.get(sid), has=!!(c&&c.hp);
+    return `<button class="btn small${has?' wa':''}" type="button" data-wa="${sid}" data-wak="${esc(kind||'belum')}"${rid?` data-war="${esc(rid)}"`:''}
+      title="${has?'Buka WhatsApp dengan pesan yang sudah terisi':'Nomor WA orang tua belum ada'}">${has?'💬 WA ortu':'＋ No. WA'}</button>`
+      +(has?` <button class="linkbtn small" type="button" data-hp="${sid}" title="Ubah nomor WA orang tua">ubah no.</button>`:'');
+  }
+  const salam=()=>{const h=new Date().getHours();return h<11?'Selamat pagi':h<15?'Selamat siang':h<18?'Selamat sore':'Selamat malam';};
+  // Jumlah HARI tidak hadir 30 hari terakhir (lebih efektif daripada hanya "hari ini tidak masuk")
+  function akumulasi(sid,nama){
+    const c=kontak.get(sid)||{}, sk=+c.sakit||0, iz=+c.izin||0, al=+c.alpa||0, n=sk+iz+al;
+    if(n<2)return '';
+    const parts=[[sk,'sakit'],[iz,'izin'],[al,'tanpa keterangan']].filter(([v])=>v>0).map(([v,l])=>`${v} hari ${l}`);
+    return `\n\nSebagai informasi, dalam 30 hari terakhir ${nama} sudah tidak masuk sekolah *${n} hari* (${parts.join(', ')}).`;
+  }
+  function waPesan(sid,kind,rec){
+    const s=byId(sid), nama=s.name, tgl=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const dari=session&&session.name?session.name:'Wali kelas';
+    const link=/^https?:$/.test(location.protocol)?location.origin+location.pathname+'#lapor?k='+encodeURIComponent(kelas):'';
+    const buka=`${salam()} Bapak/Ibu orang tua/wali dari *${nama}* (kelas ${kelas}).`;
+    const tutup=`\n\nTerima kasih.\n${dari}\n${SEKOLAH}`;
+    const per=rec?(rec.dari===rec.sampai?fmtDate(rec.dari):fmtDate(rec.dari)+' – '+fmtDate(rec.sampai)):'';
+    if(kind==='belum')return `${buka}\n\nHingga pukul ${clock()} hari ini (${tgl}), ${nama} belum hadir di sekolah dan kami belum menerima kabar.\n\nJika ${nama} sakit atau izin, mohon kabari kami lewat pesan ini${link?` atau isi formulir berikut:\n${link}`:'.'}`+akumulasi(sid,nama)+tutup;
+    if(kind==='alpa')return `${buka}\n\nKami informasikan bahwa ${nama} tercatat *tidak hadir tanpa keterangan (Alpa)* pada ${tgl}.\n\nJika ada alasan yang belum kami terima, mohon kabari kami lewat pesan ini${link?` atau isi formulir:\n${link}`:'.'}`+akumulasi(sid,nama)+tutup;
+    if(kind==='sakit'||kind==='izin')return `${buka}\n\nLaporan *${LBL[kind]}* untuk ${nama}${per?` (${per})`:''} sudah kami terima dan dicatat${rec&&rec.no?` dengan nomor ${rec.no}`:''}.${kind==='sakit'?` Semoga ${nama} lekas sembuh.`:''}`+akumulasi(sid,nama)+tutup;
+    // 'rekap': ringkasan kehadiran
+    const ak=akumulasi(sid,nama);
+    return `${buka}\n\nKami ingin berbagi catatan kehadiran ${nama}.`+(ak?ak.replace(/^\n\nSebagai informasi, dalam/,' Dalam'):` Dalam 30 hari terakhir ${nama} jarang tidak masuk.`)
+      +`\n\nKehadiran rutin sangat membantu ${nama} mengikuti pelajaran. Jika ada kendala, kami terbuka untuk berdiskusi.`+tutup;
+  }
+  function waBuka(sid,kind,rid){
+    const c=kontak.get(sid);if(!c||!c.hp)return hpEdit(sid,{kind,rid});
+    const rec=rid?reports.find(r=>r.id===rid)||incoming.find(r=>r.id===rid):null;
+    const url='https://wa.me/'+c.hp+'?text='+encodeURIComponent(waPesan(sid,kind,rec));
+    const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+    document.body.appendChild(a);a.click();a.remove();
+    authed('wa_catat',{p_sid:sid,p_jenis:kind}).catch(()=>{});
+  }
+  // Dialog nomor WA
+  let hpSid=null, hpNext=null;
+  function hpEdit(sid,next){
+    hpSid=sid;hpNext=next||null;const s=byId(sid), c=kontak.get(sid);
+    $('hpLead').textContent=`Orang tua/wali dari ${s.name} (NIS ${s.nis}).`;
+    $('hpInput').value=c&&c.hp?'0'+c.hp.slice(2):'';$('hpClear').hidden=!(c&&c.hp);
+    $('hpErr').hidden=true;$('hpSave').textContent=hpNext?'Simpan & buka WA':'Simpan';
+    $('hpDialog').showModal();$('hpInput').focus();
+  }
+  async function hpSave(val,btn){
+    const sid=hpSid, next=hpNext;
+    try{
+      if(btn)btn.disabled=true;
+      const hp=await authed('hp_ortu_set',{p_sid:sid,p_hp:val});
+      const c=kontak.get(sid)||{sid,sakit:0,izin:0,alpa:0};kontak.set(sid,Object.assign({},c,{hp}));
+      $('hpDialog').close();toast(hp?'Nomor WA orang tua disimpan.':'Nomor WA orang tua dihapus.','ok');
+      renderAll();
+      const wa=$('who').querySelector('.waact');if(wa&&selected===sid)wa.innerHTML=waBtn(sid,wa.dataset.k,wa.dataset.r||null);
+      if(hp&&next)waBuka(sid,next.kind,next.rid);
+    }catch(e){$('hpErr').textContent=e.message;$('hpErr').hidden=false;}
+    finally{if(btn)btn.disabled=false;}
+  }
+  $('hpForm').addEventListener('submit',e=>{e.preventDefault();const v=$('hpInput').value.trim();
+    if(!v){$('hpErr').textContent='Isi nomor WhatsApp dulu.';$('hpErr').hidden=false;return;}
+    hpSave(v,$('hpSave'));});
+  $('hpClear').addEventListener('click',e=>hpSave('',e.currentTarget));
+  $('hpCancel').addEventListener('click',()=>$('hpDialog').close());
+  // Satu penangan klik untuk semua tombol WA (antrean, tabel, form, daftar perhatian)
+  document.addEventListener('click',e=>{
+    const w=e.target.closest('button[data-wa]');if(w){e.preventDefault();return waBuka(+w.dataset.wa,w.dataset.wak,w.dataset.war||null);}
+    const h=e.target.closest('button[data-hp]');if(h){e.preventDefault();return hpEdit(+h.dataset.hp);}
+  });
+
   $('queue').addEventListener('click',e=>{
     const l=e.target.closest('button[data-lamp]');if(l)return openLampiran(l.dataset.lamp);
     const a=e.target.closest('button[data-acc]');if(a)return accept([a.dataset.acc],a);

@@ -1,7 +1,7 @@
 # Catatan Lanjutan — Hadirin
 
 > Baca file ini dulu setiap mau melanjutkan proyek.
-> Terakhir diperbarui: **18 November 2026 (v0.6.1)**
+> Terakhir diperbarui: **19 November 2026 (v0.10.0)**
 
 ## 1. Ringkasnya
 
@@ -15,8 +15,10 @@ Hadirin adalah web absensi sekolah. Isinya:
 | Bagian | Di mana |
 |---|---|
 | Website online | https://hadirin-three.vercel.app |
-| Form orang tua | https://hadirin-three.vercel.app/#lapor (per kelas: `#lapor?k=XI%20IPA%201`) |
-| Cek status laporan | https://hadirin-three.vercel.app/#cek |
+| Halaman depan publik | https://hadirin-three.vercel.app/ (boleh diindeks Google) |
+| Aplikasi (login staf) | https://hadirin-three.vercel.app/app (noindex) |
+| Form orang tua | https://hadirin-three.vercel.app/app#lapor (per kelas: `#lapor?k=XI%20IPA%201`). Link lama `/#lapor` diteruskan otomatis |
+| Cek status laporan | https://hadirin-three.vercel.app/app#cek |
 | Hosting | Vercel, proyek **hadirin**, akun `vinn22` (login CLI sebagai vinnvinn02) |
 | Database | Supabase, proyek **hadirin** (`pzhlreyseedjkgzevuun`, server Tokyo) di organisasi "VinnVinn02's OrgHadirin" (Free) |
 | Folder proyek | `Downloads\hadirin\hadirin` |
@@ -35,7 +37,10 @@ Hadirin adalah web absensi sekolah. Isinya:
 
 ```
 public/                  ← kode sumber website
-  index.html             ← semua tampilan (login, form ortu, dashboard, dialog)
+  index.html             ← halaman depan publik (SEO: meta, OG, JSON-LD, FAQ, kontak)
+  app.html               ← aplikasi: semua tampilan (login, form ortu, dashboard, dialog)
+  assets/css/landing.css, assets/js/landing.js, assets/og-image.png ← khusus halaman depan
+  robots.txt, sitemap.xml
   assets/js/app.js       ← semua logika (panggil server lewat fungsi rpc())
   assets/css/style.css   ← tampilan, termasuk tema gelap
   vendor/face-api.js     ← library pengenal wajah (TensorFlow.js)
@@ -92,9 +97,9 @@ Kalau yang diubah **database**:
 ## 7. Yang BELUM / ide lanjutan (urut prioritas)
 
 1. **Siapkan untuk pemakaian sungguhan**
-   - Hapus daftar akun demo dari halaman login: variabel `demo` di `app.js` dan `<details>` di `index.html`.
+   - Hapus daftar akun demo dari halaman login: variabel `demo` di `app.js` dan `<details>` di `app.html`.
    - Ganti semua sandi demo.
-   - Ganti nama sekolah "SMA Harapan Bangsa" di `index.html`.
+   - Ganti nama sekolah "SMA Harapan Bangsa" di `app.html`.
 2. **Import data siswa asli dari Excel/CSV**. Sekarang siswa dan kelas masih data contoh dari `_seed_dasar()` di SQL.
    Perlu menu admin: unggah CSV berisi kolom NIS, nama, kelas.
 3. **Kelola kelas & wali kelas** dari menu admin. Sekarang daftar kelas masih tertulis di kode (`classList` di `app.js` dan tabel `kelas`).
@@ -119,3 +124,23 @@ Kalau yang diubah **database**:
 - **Kata sandi database Supabase** dibuat otomatis saat proyek dibuat dan tidak disimpan di sini.
   Tidak dibutuhkan website. Kalau perlu, reset di Supabase → Settings → Database.
 - **Login Supabase CLI** di terminal sempat macet. Untuk mengubah database, pakai SQL Editor di dashboard saja.
+
+## 9. Pembaruan keamanan (19 November 2026)
+
+Dua migrasi baru + pengujian sudah ditambahkan. **Jalankan berurutan di Supabase → SQL Editor:**
+
+1. `supabase/migrations/20261119000000_hardening.sql`
+   - Ambang kecocokan wajah diseragamkan di server (tolak jarak > 0.5 dan NaN).
+   - Validasi *magic bytes* lampiran (isi file harus JPG/PNG/WEBP/PDF asli).
+   - Fungsi baru: `siswa_hapus_data` (hapus data siswa, UU PDP), `retensi_bersihkan` (bersihkan data lama),
+     `hapus_lampiran_yatim` (bersihkan lampiran tanpa laporan).
+2. `supabase/migrations/20261119010000_enkripsi-wajah.sql`
+   - Descriptor wajah kini terenkripsi AES-256, kunci di **Supabase Vault** (dibuat otomatis: `hadirin_wajah_key`).
+   - Front-end (`app.js`) **tidak berubah** — enkripsi/dekripsi transparan di server.
+
+Pengujian (opsional, jalankan di SQL Editor): `supabase/tests/01_hardening_test.sql` lalu
+`supabase/tests/02_enkripsi_test.sql` (lihat `supabase/tests/README.md`).
+
+Catatan: bila `enkripsi-wajah.sql` gagal dengan *"permission denied ... decrypted_secrets"*,
+pastikan fitur **Vault** aktif di Supabase (Database → Vault). Belum ada tombol UI untuk fungsi retensi
+yang baru; untuk sementara dipanggil langsung lewat SQL atau ditambahkan ke menu admin belakangan.

@@ -764,17 +764,23 @@
     try{
       const r=await authed('hadir_scan',{p_sid:sid,p_jarak:Math.round(d*1000)/1000});
       hadir.add(sid);
-      camRecent.unshift({t:clock(),m:`${r.name} hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
-      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');renderKamera();
+      camRecent.unshift({t:clock(),name:r.name,m:`hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
+      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');camFlash(r.name,r.telat?'hadir · terlambat, Alpa dibatalkan':'hadir');renderKamera();
     }catch(e){camMsg(e.message,'warn');}
     finally{scanBusy.delete(sid);track.delete(sid);}
+  }
+  // Pemberitahuan besar di atas video: "✓ Bima hadir" (±3 detik) supaya siswa & guru langsung tahu
+  function camFlash(name,sub){
+    const f=$('camFlash');$('camFlashName').textContent=name;$('camFlashSub').textContent=sub;
+    f.hidden=false;f.classList.remove('show');void f.offsetWidth;f.classList.add('show');
+    clearTimeout(camFlash._t);camFlash._t=setTimeout(()=>{f.hidden=true;},3200);
   }
   function renderKamera(){
     $('camKelas').textContent='Kelas '+kelas;
     $('camCount').textContent=`${faces.length} dari ${students.length} wajah terdaftar`;
     $('camHadir').textContent=`Hadir ${hadir.size} dari ${students.length}`;
     $('camAbsenPanel').hidden=camMode!=='absen';$('camDaftarPanel').hidden=camMode!=='daftar';
-    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
+    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${l.name?`<b>${esc(l.name)}</b> `:''}${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
     const sel=$('enSiswa'), cur=sel.value, has=new Set(faces.map(f=>f.sid));
     sel.innerHTML=students.map(s=>`<option value="${s.id}">${esc(s.name)}${has.has(s.id)?' (sudah terdaftar)':''}</option>`).join('');
     if(cur&&students.some(s=>String(s.id)===cur))sel.value=cur;

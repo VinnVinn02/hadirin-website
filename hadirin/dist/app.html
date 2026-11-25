@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-hMsjM5wi1jh+NQMUtNT8efigjX9ktAjIxQLUdXncP7g='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-NpkIhOxRXDok3yTTbFx3+gb+HM9Vq9AettTpTNrIFPI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hadirin — Absensi Wajah &amp; Pelaporan</title>
 <meta name="description" content="Hadirin: sistem absensi wajah dengan pelaporan sakit/izin dari orang tua, login Admin/TU/Guru, dan rekap sekolah.">
@@ -260,6 +260,13 @@ svg text{fill:var(--muted);font-family:var(--f-body);font-size:11px}
 .log{list-style:none;margin:0;padding:0;font-size:12.5px;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
 .log li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px}
 .log time{color:var(--muted)}
+.log li.empty{display:block}
+.camflash{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:12px;max-width:calc(100% - 28px);padding:12px 20px 12px 14px;border-radius:14px;background:rgba(22,120,80,.94);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.camflash .ck{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:50%;background:#fff;color:#167850;font-size:22px;font-weight:800}
+.camflash b{display:block;font-family:var(--f-display);font-size:clamp(18px,3vw,26px);line-height:1.15;overflow-wrap:anywhere}
+.camflash small{display:block;font-size:13px;opacity:.9}
+.camflash.show{animation:flashIn .25s ease both}
+@keyframes flashIn{from{opacity:0;transform:translate(-50%,-10px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
 .check{color:var(--hadir);font-weight:700}
 .cross{color:var(--muted)}
 .newpw{background:var(--hadir-bg);color:var(--hadir);border-radius:10px;padding:10px 12px;font-size:13px}
@@ -760,6 +767,7 @@ input,select,textarea{border-radius:11px}
           <div class="cam" id="camBox">
             <video id="camVideo" playsinline muted></video>
             <canvas id="camCanvas" aria-hidden="true"></canvas>
+            <div class="camflash" id="camFlash" aria-hidden="true" hidden><span class="ck">✓</span><span><b id="camFlashName"></b><small id="camFlashSub">hadir</small></span></div>
             <div class="camoff" id="camOff"><span class="big">📷</span><span>Kamera belum aktif</span><span class="hint">Model ±7 MB diunduh sekali saat pertama kali dipakai.</span></div>
           </div>
           <p class="camstatus" id="camStatus" role="status">Tekan “Mulai kamera”. Izinkan akses kamera jika browser meminta.</p>
@@ -1695,17 +1703,23 @@ input,select,textarea{border-radius:11px}
     try{
       const r=await authed('hadir_scan',{p_sid:sid,p_jarak:Math.round(d*1000)/1000});
       hadir.add(sid);
-      camRecent.unshift({t:clock(),m:`${r.name} hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
-      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');renderKamera();
+      camRecent.unshift({t:clock(),name:r.name,m:`hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
+      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');camFlash(r.name,r.telat?'hadir · terlambat, Alpa dibatalkan':'hadir');renderKamera();
     }catch(e){camMsg(e.message,'warn');}
     finally{scanBusy.delete(sid);track.delete(sid);}
+  }
+  // Pemberitahuan besar di atas video: "✓ Bima hadir" (±3 detik) supaya siswa & guru langsung tahu
+  function camFlash(name,sub){
+    const f=$('camFlash');$('camFlashName').textContent=name;$('camFlashSub').textContent=sub;
+    f.hidden=false;f.classList.remove('show');void f.offsetWidth;f.classList.add('show');
+    clearTimeout(camFlash._t);camFlash._t=setTimeout(()=>{f.hidden=true;},3200);
   }
   function renderKamera(){
     $('camKelas').textContent='Kelas '+kelas;
     $('camCount').textContent=`${faces.length} dari ${students.length} wajah terdaftar`;
     $('camHadir').textContent=`Hadir ${hadir.size} dari ${students.length}`;
     $('camAbsenPanel').hidden=camMode!=='absen';$('camDaftarPanel').hidden=camMode!=='daftar';
-    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
+    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${l.name?`<b>${esc(l.name)}</b> `:''}${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
     const sel=$('enSiswa'), cur=sel.value, has=new Set(faces.map(f=>f.sid));
     sel.innerHTML=students.map(s=>`<option value="${s.id}">${esc(s.name)}${has.has(s.id)?' (sudah terdaftar)':''}</option>`).join('');
     if(cur&&students.some(s=>String(s.id)===cur))sel.value=cur;

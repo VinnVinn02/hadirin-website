@@ -11,6 +11,12 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 - Build menolak jalan selama halaman depan masih berisi `GANTI:` (tes lokal: `HADIRIN_DRAFT=1`).
   Bagian kontak sementara diganti tombol "Mulai memakai Hadirin" sampai data kontak asli tersedia.
 
+- **Kamera kelas:** setiap siswa yang tercatat hadir memunculkan pemberitahuan besar di atas video, misalnya "✓ Bima Saputra hadir" (±3 detik).
+  Nama siswa di daftar "Hadir lewat kamera" ditebalkan.
+
+### Diperbaiki
+- Teks "Belum ada yang tercatat di sesi ini" di panel kamera tidak lagi terpotong satu kata per baris.
+
 ### Diubah
 - Aplikasi pindah ke `/app` (`public/app.html`). Link lama `/#lapor`, `/#lapor?k=…`, dan `/#cek` diteruskan otomatis ke `/app`.
 - `X-Robots-Tag: noindex` sekarang hanya untuk `/app`, `/models`, dan `/vendor`; halaman depan boleh diindeks (Vercel dan Nginx).

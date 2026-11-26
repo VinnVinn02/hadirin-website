@@ -2,6 +2,15 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.13.0] — 2026-11-26
+### Ditambahkan
+- **🔍 Cari siswa** (tombol di header, semua peran; guru hanya kelasnya sendiri): cari dengan NIS atau nama.
+- **Detail siswa**: data diri, status data wajah (tanggal & persetujuan), rekap 30 hari (hadir/sakit/izin/alpa),
+  kalender kehadiran, galeri foto surat/lampiran, dan riwayat laporan. Bisa juga dibuka dengan klik nama di menu Data siswa.
+- Setiap pembukaan detail siswa dicatat di log audit (khusus admin) — data pribadi, UU PDP.
+- Migrasi `20261126010000_detail-siswa.sql`: RPC `siswa_cari`, `siswa_detail`.
+- Catatan: Hadirin tetap tidak menyimpan foto wajah; "foto" di detail siswa adalah lampiran surat.
+
 ## [0.12.0] — 2026-11-26
 ### Ditambahkan
 - **Menu Data siswa** (Admin + TU): tambah, ubah, hapus siswa (NIS, nama, kelas, no. WA ortu), cari per kelas,

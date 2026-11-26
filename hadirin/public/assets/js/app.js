@@ -693,7 +693,7 @@
     $('sfKelas').value=sEdit?sEdit.kelas:(kl.some(k=>k.id===fk)?fk:sKelas);
     const list=(sdata.siswa||[]).filter(s=>!q||s.name.toLowerCase().includes(q)||s.nis.toLowerCase().includes(q));
     $('sbody').innerHTML=list.length?list.map(s=>`<tr>
-      <td class="mono">${esc(s.nis)}</td><td><b>${esc(s.name)}</b></td>
+      <td class="mono">${esc(s.nis)}</td><td><button class="linkbtn" type="button" data-sdet="${s.id}"><b>${esc(s.name)}</b></button></td>
       <td class="mono">${s.hp?esc(hpTampil(s.hp)):'<span class="sub">–</span>'}</td>
       <td>${s.wajah?'<span class="pill hadir">Terdaftar</span>':'<span class="pill wait">Belum</span>'}</td>
       <td style="white-space:nowrap"><span style="display:flex;gap:6px"><button class="btn small" type="button" data-sedit="${s.id}">Ubah</button><button class="btn small danger" type="button" data-sdel="${s.id}">Hapus</button></span></td></tr>`).join('')
@@ -720,6 +720,7 @@
   $('sfBatal').addEventListener('click',resetSiswaForm);
   $('sbody').addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b||!sdata)return;
+    if(b.dataset.sdet)return openDetail(+b.dataset.sdet);
     const s=(sdata.siswa||[]).find(x=>String(x.id)===(b.dataset.sedit||b.dataset.sdel));if(!s)return;
     if(b.dataset.sedit){sEdit=s;$('sfNis').value=s.nis;$('sfNama').value=s.name;$('sfKelas').value=s.kelas;$('sfHp').value=hpTampil(s.hp);
       $('sfEyebrow').textContent='Ubah data';$('sfTitle').textContent=s.name;$('sfBatal').hidden=false;$('sfSimpan').textContent='Simpan perubahan';$('sfErr').hidden=true;
@@ -828,6 +829,79 @@
     if(!r)return;
     toast(nyalakan?'Data contoh harian dinyalakan.':`Data contoh dimatikan${r.dihapus?`, ${r.dihapus} kehadiran hari ini dikosongkan`:''}.`,'ok');refresh(true);
   });
+
+  /* ---------- Cari siswa + detail (semua peran; guru hanya kelasnya) ----------
+     Hadirin tidak menyimpan foto wajah. "Foto" di sini = lampiran surat (dokter/izin). */
+  let detUrls=[], detTimer=null, detReq=0;
+  const tglID=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+  const fmtTgl=s=>tglID(s).toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+  function detClear(){detUrls.forEach(u=>URL.revokeObjectURL(u));detUrls=[];}
+  function detShowSearch(){detClear();detReq++;$('detBody').hidden=true;$('detSearch').hidden=false;$('detBack').hidden=true;$('detTitle').textContent='Cari siswa';$('detQ').focus();}
+  $('cariBtn').addEventListener('click',()=>{$('detDialog').showModal();$('detQ').value='';$('detRes').innerHTML='';$('detHint').textContent='Contoh: 2301102 atau Bima.'+(session&&session.role==='guru'?' Hanya siswa kelas Anda.':'');detShowSearch();});
+  $('detClose').addEventListener('click',()=>$('detDialog').close());
+  $('detDialog').addEventListener('close',()=>{detClear();detReq++;});
+  $('detBack').addEventListener('click',detShowSearch);
+  $('detQ').addEventListener('input',()=>{clearTimeout(detTimer);detTimer=setTimeout(async()=>{
+    const q=$('detQ').value.trim();if(q.length<2){$('detRes').innerHTML='';return;}
+    try{const r=await authed('siswa_cari',{p_q:q});if($('detQ').value.trim()!==q)return;
+      $('detRes').innerHTML=r.length?r.map(s=>`<li><button type="button" data-sid="${s.id}"><span><b>${esc(s.name)}</b> <span class="sub">${esc(s.kelas)}</span></span><span class="mono">${esc(s.nis)}</span></button></li>`).join(''):'<li class="empty">Tidak ada siswa yang cocok.</li>';}
+    catch(e){$('detRes').innerHTML=`<li class="err">${esc(e.message)}</li>`;}},300);});
+  $('detRes').addEventListener('click',e=>{const b=e.target.closest('button[data-sid]');if(b)openDetail(+b.dataset.sid);});
+  $('detBody').addEventListener('click',e=>{const b=e.target.closest('button[data-lamp]');if(b)openLampiran(b.dataset.lamp);});
+
+  async function openDetail(sid){
+    const dlg=$('detDialog');if(!dlg.open)dlg.showModal();
+    detClear();const my=++detReq;
+    $('detSearch').hidden=true;$('detBody').hidden=false;$('detBack').hidden=false;$('detTitle').textContent='Memuat…';
+    $('detBody').innerHTML='<p class="hint">Memuat data siswa…</p>';
+    let x;try{x=await authed('siswa_detail',{p_sid:sid});}catch(e){$('detTitle').textContent='Data siswa';$('detBody').innerHTML=`<p class="err">${esc(e.message)}</p>`;return;}
+    if(my!==detReq)return;
+    $('detTitle').textContent=x.name;
+    const hadirSet=new Set(x.hadir||[]), lap=x.laporan||[];
+    const statusHari=dd=>{
+      if(hadirSet.has(dd))return 'hadir';
+      const l=lap.find(r=>r.status==='diterima'&&r.dari<=dd&&r.sampai>=dd);if(l)return l.jenis;
+      return '';};
+    // hari sekolah (Senin–Jumat) 30 hari terakhir
+    const days=[];for(let i=0;i<30;i++){const dd=addDays(x.hari,-i);const w=tglID(dd).getDay();if(w>0&&w<6)days.push(dd);}
+    const cnt={hadir:0,sakit:0,izin:0,alpa:0,kosong:0};days.forEach(dd=>{const st=statusHari(dd)||'kosong';cnt[st]++;});
+    const today=statusHari(x.hari);
+    const lampList=lap.filter(r=>r.lampiran);
+    const hpTxt=x.hp?('0'+String(x.hp).slice(2)).replace(/(\d{4})(\d{4})(\d+)/,'$1 $2 $3'):'–';
+    $('detBody').innerHTML=`<div class="det">
+      <div class="det-id">
+        <div><small>NIS</small><b class="mono">${esc(x.nis)}</b></div>
+        <div><small>Kelas</small><b>${esc(x.kelas)}</b></div>
+        <div><small>Wali kelas</small>${esc(x.wali||'–')}</div>
+        <div><small>No. WA orang tua</small><span class="mono">${esc(hpTxt)}</span></div>
+        <div><small>Hari ini</small>${today?`<span class="pill ${today}">${today==='hadir'?'Hadir':LBL[today]}</span>`:'<span class="pill wait">Belum ada kabar</span>'}</div>
+        <div><small>Data wajah</small>${x.wajah?`<span class="pill hadir">Terdaftar</span><div class="sub">${esc(x.wajah.at)} · persetujuan: ${esc(x.wajah.persetujuan)}</div>`:'<span class="pill wait">Belum didaftarkan</span>'}</div>
+      </div>
+      <p class="hint" style="margin:0">🔒 Hadirin tidak menyimpan foto wajah siswa, hanya 128 angka ciri wajah yang terenkripsi. Foto yang ada di bawah adalah lampiran surat.</p>
+      <div><h3>30 hari terakhir (hari sekolah)</h3>
+        <div class="tiles">${[['Hadir','hadir','var(--hadir)'],['Sakit','sakit','var(--sakit)'],['Izin','izin','var(--izin)'],['Alpa','alpa','var(--alpa)']].map(([l,k,c])=>`<div class="tile" style="--accent:${c}"><span class="lbl">${l}</span><span class="num">${cnt[k]}</span><span class="note">hari</span></div>`).join('')}</div>
+        <p class="hint" style="margin:6px 0 0">${cnt.kosong?`${cnt.kosong} hari tanpa catatan (tidak terscan dan tidak ada laporan).`:''}</p></div>
+      <div><h3>Kalender kehadiran</h3><div class="cal">${days.slice(0,20).map(dd=>{const st=statusHari(dd);
+        return `<span class="${st||'kosong'}" title="${esc(dd)}"><b>${esc(fmtTgl(dd))}</b>${st==='hadir'?'Hadir':st?LBL[st]:'–'}</span>`;}).join('')}</div></div>
+      <div><h3>Foto surat &amp; lampiran (${lampList.length})</h3>${lampList.length?`<div class="gal" id="detGal">${lampList.map(r=>`<button type="button" data-lamp="${esc(r.id)}" title="${esc(r.file)}"><span class="pdf" data-ph="${esc(r.id)}">${/\.pdf$/i.test(r.file)?'📄':'⏳'}</span><small>${esc(fmtTgl(r.dari))} · ${esc(r.file)}</small></button>`).join('')}</div>`:'<p class="hint" style="margin:0">Belum ada lampiran surat untuk siswa ini.</p>'}</div>
+      <div><h3>Riwayat laporan (${lap.length})</h3>${lap.length?`<div class="tablewrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Status</th><th>Lampiran</th></tr></thead><tbody>${lap.map(r=>`<tr>
+        <td class="mono" style="white-space:nowrap">${esc(fmtTgl(r.dari))}${r.sampai!==r.dari?' – '+esc(fmtTgl(r.sampai)):''}</td>
+        <td><span class="pill ${esc(r.jenis)}">${LBL[r.jenis]}</span></td>
+        <td><div class="ket">${esc(r.ket)}</div><div class="sub">${esc(r.pelapor||'')}</div></td>
+        <td>${r.status==='masuk'?'<span class="pill wait">Menunggu wali kelas</span>':'<span class="pill hadir">Diterima</span>'}${r.verif?`<div class="sub">Surat: ${esc(r.verif)}${r.alasan?' · '+esc(r.alasan):''}</div>`:''}</td>
+        <td class="mono">${fileBtn(r)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="hint" style="margin:0">Belum ada laporan sakit/izin/alpa.</p>'}</div>
+    </div>`;
+    // muat pratinjau foto satu per satu (maks 12) supaya ringan
+    for(const r of lampList.slice(0,12)){
+      if(/\.pdf$/i.test(r.file))continue;
+      try{const a=await authed('lampiran_get',{p_id:r.id});if(my!==detReq)return;
+        if(!/^image\//.test(a.mime)){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='📄';continue;}
+        const bin=atob(a.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+        const url=URL.createObjectURL(new Blob([u],{type:a.mime}));detUrls.push(url);
+        const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph){const img=new Image();img.src=url;img.alt='Lampiran '+r.file;ph.replaceWith(img);}
+      }catch(_){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='⚠️';}
+    }
+  }
 
   /* ---------- Kamera kelas: scan wajah (face-api.js / TensorFlow.js, model CNN) ----------
      Deteksi: TinyFaceDetector (CNN), 68 titik wajah, pengenal: ResNet-34 -> descriptor 128 angka.

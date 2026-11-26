@@ -216,6 +216,7 @@
         <span class="av" id="uAv"></span>
         <span><span class="uname" id="uName"></span> <span class="pill" id="uRole"></span><span class="usub" id="uSub" style="display:block"></span></span>
         <button class="iconbtn onband" type="button" data-theme-btn aria-label="Ganti tema">◐</button>
+        <button class="btn small" type="button" id="cariBtn">🔍 Cari siswa</button>
         <button class="btn small" type="button" id="pwBtn">Ganti sandi</button>
         <button class="btn small" type="button" id="logoutBtn">Keluar</button>
       </div>
@@ -606,6 +607,19 @@
     <p class="err" id="hpErr" hidden role="alert"></p>
     <div class="actions"><button class="btn" type="button" id="hpCancel">Batal</button><button class="btn" type="button" id="hpClear">Hapus nomor</button><button class="btn primary" type="submit" id="hpSave">Simpan</button></div>
   </form>
+</dialog>
+
+<dialog id="detDialog" class="wide" aria-labelledby="detTitle">
+  <div class="dform">
+    <div class="panel-head"><div><div class="eyebrow">Data siswa</div><h2 id="detTitle">Cari siswa</h2></div>
+      <span style="display:flex;gap:6px"><button class="btn small" type="button" id="detBack" hidden>← Cari lagi</button><button class="btn small" type="button" id="detClose">Tutup</button></span></div>
+    <div id="detSearch">
+      <input type="search" id="detQ" placeholder="Ketik NIS atau nama siswa (minimal 2 huruf)" aria-label="Cari NIS atau nama siswa" autocomplete="off">
+      <p class="hint" id="detHint" style="margin:8px 0 0">Contoh: 2301102 atau Bima.</p>
+      <ul class="detres" id="detRes"></ul>
+    </div>
+    <div id="detBody" hidden></div>
+  </div>
 </dialog>
 
 <dialog id="lampDialog" class="wide" aria-labelledby="lampTitle">

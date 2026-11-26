@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-36S6ggwa6i7MbNZ7+/Exnh6QxQ5Rgnj+6qZdbii4LFw='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-mWIP4C8tZvvztRqEne9L+zvQ6p6S/l/BbN5IkkbOUxU='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hadirin — Absensi Wajah &amp; Pelaporan</title>
 <meta name="description" content="Hadirin: sistem absensi wajah dengan pelaporan sakit/izin dari orang tua, login Admin/TU/Guru, dan rekap sekolah.">
@@ -331,6 +331,30 @@ dialog{border:0;border-radius:18px;padding:0;background:var(--surface);color:var
 dialog::backdrop{background:rgba(8,20,16,.55);backdrop-filter:blur(3px)}
 dialog[open]{animation:rise .2s ease both}
 dialog.wide{width:min(760px,calc(100% - 32px))}
+.detres{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.detres button{width:100%;text-align:left;font:inherit;display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);cursor:pointer}
+.detres button:hover{border-color:var(--brand)}
+.det{display:flex;flex-direction:column;gap:16px;max-height:70vh;overflow:auto;padding-right:4px}
+.det h3{font-size:14px;margin:0 0 8px;font-family:var(--f-display)}
+.det-id{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.det-id div{background:var(--surface-2);border-radius:10px;padding:8px 12px;font-size:13px}
+.det-id small{display:block;color:var(--muted);font-size:11.5px}
+.det .tiles{grid-template-columns:repeat(4,1fr)}
+.det .tile{padding:10px 12px}.det .tile .num{font-size:24px}
+@media (max-width:560px){.det .tiles{grid-template-columns:repeat(2,1fr)}}
+.cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
+.cal span{border-radius:8px;padding:6px 4px;text-align:center;font-size:11px;line-height:1.3;border:1px solid var(--line)}
+.cal span b{display:block;font-size:12px}
+.cal .hadir{background:var(--hadir-bg);color:var(--hadir);border-color:transparent}
+.cal .sakit{background:var(--sakit-bg);color:var(--sakit);border-color:transparent}
+.cal .izin{background:var(--izin-bg);color:var(--izin);border-color:transparent}
+.cal .alpa{background:var(--alpa-bg);color:var(--alpa);border-color:transparent}
+.cal .kosong{color:var(--muted);border-style:dashed}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.gal button{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:0;cursor:pointer;overflow:hidden;aspect-ratio:3/4;display:flex;flex-direction:column;color:var(--fg);font:inherit}
+.gal img{width:100%;flex:1;min-height:0;object-fit:cover;background:#fff}
+.gal .pdf{flex:1;display:grid;place-items:center;font-size:30px}
+.gal small{display:block;font-size:11px;padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
 .lampview{display:grid;place-items:center;min-height:160px;max-height:70vh;overflow:auto;background:var(--surface-2);border-radius:12px;padding:10px}
 .lampview img{max-width:100%;max-height:66vh;object-fit:contain;border-radius:8px;background:#fff}
 .dform{padding:22px;display:flex;flex-direction:column;gap:14px}
@@ -625,6 +649,7 @@ input,select,textarea{border-radius:11px}
         <span class="av" id="uAv"></span>
         <span><span class="uname" id="uName"></span> <span class="pill" id="uRole"></span><span class="usub" id="uSub" style="display:block"></span></span>
         <button class="iconbtn onband" type="button" data-theme-btn aria-label="Ganti tema">◐</button>
+        <button class="btn small" type="button" id="cariBtn">🔍 Cari siswa</button>
         <button class="btn small" type="button" id="pwBtn">Ganti sandi</button>
         <button class="btn small" type="button" id="logoutBtn">Keluar</button>
       </div>
@@ -1015,6 +1040,19 @@ input,select,textarea{border-radius:11px}
     <p class="err" id="hpErr" hidden role="alert"></p>
     <div class="actions"><button class="btn" type="button" id="hpCancel">Batal</button><button class="btn" type="button" id="hpClear">Hapus nomor</button><button class="btn primary" type="submit" id="hpSave">Simpan</button></div>
   </form>
+</dialog>
+
+<dialog id="detDialog" class="wide" aria-labelledby="detTitle">
+  <div class="dform">
+    <div class="panel-head"><div><div class="eyebrow">Data siswa</div><h2 id="detTitle">Cari siswa</h2></div>
+      <span style="display:flex;gap:6px"><button class="btn small" type="button" id="detBack" hidden>← Cari lagi</button><button class="btn small" type="button" id="detClose">Tutup</button></span></div>
+    <div id="detSearch">
+      <input type="search" id="detQ" placeholder="Ketik NIS atau nama siswa (minimal 2 huruf)" aria-label="Cari NIS atau nama siswa" autocomplete="off">
+      <p class="hint" id="detHint" style="margin:8px 0 0">Contoh: 2301102 atau Bima.</p>
+      <ul class="detres" id="detRes"></ul>
+    </div>
+    <div id="detBody" hidden></div>
+  </div>
 </dialog>
 
 <dialog id="lampDialog" class="wide" aria-labelledby="lampTitle">
@@ -1723,7 +1761,7 @@ input,select,textarea{border-radius:11px}
     $('sfKelas').value=sEdit?sEdit.kelas:(kl.some(k=>k.id===fk)?fk:sKelas);
     const list=(sdata.siswa||[]).filter(s=>!q||s.name.toLowerCase().includes(q)||s.nis.toLowerCase().includes(q));
     $('sbody').innerHTML=list.length?list.map(s=>`<tr>
-      <td class="mono">${esc(s.nis)}</td><td><b>${esc(s.name)}</b></td>
+      <td class="mono">${esc(s.nis)}</td><td><button class="linkbtn" type="button" data-sdet="${s.id}"><b>${esc(s.name)}</b></button></td>
       <td class="mono">${s.hp?esc(hpTampil(s.hp)):'<span class="sub">–</span>'}</td>
       <td>${s.wajah?'<span class="pill hadir">Terdaftar</span>':'<span class="pill wait">Belum</span>'}</td>
       <td style="white-space:nowrap"><span style="display:flex;gap:6px"><button class="btn small" type="button" data-sedit="${s.id}">Ubah</button><button class="btn small danger" type="button" data-sdel="${s.id}">Hapus</button></span></td></tr>`).join('')
@@ -1750,6 +1788,7 @@ input,select,textarea{border-radius:11px}
   $('sfBatal').addEventListener('click',resetSiswaForm);
   $('sbody').addEventListener('click',async e=>{
     const b=e.target.closest('button');if(!b||!sdata)return;
+    if(b.dataset.sdet)return openDetail(+b.dataset.sdet);
     const s=(sdata.siswa||[]).find(x=>String(x.id)===(b.dataset.sedit||b.dataset.sdel));if(!s)return;
     if(b.dataset.sedit){sEdit=s;$('sfNis').value=s.nis;$('sfNama').value=s.name;$('sfKelas').value=s.kelas;$('sfHp').value=hpTampil(s.hp);
       $('sfEyebrow').textContent='Ubah data';$('sfTitle').textContent=s.name;$('sfBatal').hidden=false;$('sfSimpan').textContent='Simpan perubahan';$('sfErr').hidden=true;
@@ -1858,6 +1897,79 @@ input,select,textarea{border-radius:11px}
     if(!r)return;
     toast(nyalakan?'Data contoh harian dinyalakan.':`Data contoh dimatikan${r.dihapus?`, ${r.dihapus} kehadiran hari ini dikosongkan`:''}.`,'ok');refresh(true);
   });
+
+  /* ---------- Cari siswa + detail (semua peran; guru hanya kelasnya) ----------
+     Hadirin tidak menyimpan foto wajah. "Foto" di sini = lampiran surat (dokter/izin). */
+  let detUrls=[], detTimer=null, detReq=0;
+  const tglID=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+  const fmtTgl=s=>tglID(s).toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+  function detClear(){detUrls.forEach(u=>URL.revokeObjectURL(u));detUrls=[];}
+  function detShowSearch(){detClear();detReq++;$('detBody').hidden=true;$('detSearch').hidden=false;$('detBack').hidden=true;$('detTitle').textContent='Cari siswa';$('detQ').focus();}
+  $('cariBtn').addEventListener('click',()=>{$('detDialog').showModal();$('detQ').value='';$('detRes').innerHTML='';$('detHint').textContent='Contoh: 2301102 atau Bima.'+(session&&session.role==='guru'?' Hanya siswa kelas Anda.':'');detShowSearch();});
+  $('detClose').addEventListener('click',()=>$('detDialog').close());
+  $('detDialog').addEventListener('close',()=>{detClear();detReq++;});
+  $('detBack').addEventListener('click',detShowSearch);
+  $('detQ').addEventListener('input',()=>{clearTimeout(detTimer);detTimer=setTimeout(async()=>{
+    const q=$('detQ').value.trim();if(q.length<2){$('detRes').innerHTML='';return;}
+    try{const r=await authed('siswa_cari',{p_q:q});if($('detQ').value.trim()!==q)return;
+      $('detRes').innerHTML=r.length?r.map(s=>`<li><button type="button" data-sid="${s.id}"><span><b>${esc(s.name)}</b> <span class="sub">${esc(s.kelas)}</span></span><span class="mono">${esc(s.nis)}</span></button></li>`).join(''):'<li class="empty">Tidak ada siswa yang cocok.</li>';}
+    catch(e){$('detRes').innerHTML=`<li class="err">${esc(e.message)}</li>`;}},300);});
+  $('detRes').addEventListener('click',e=>{const b=e.target.closest('button[data-sid]');if(b)openDetail(+b.dataset.sid);});
+  $('detBody').addEventListener('click',e=>{const b=e.target.closest('button[data-lamp]');if(b)openLampiran(b.dataset.lamp);});
+
+  async function openDetail(sid){
+    const dlg=$('detDialog');if(!dlg.open)dlg.showModal();
+    detClear();const my=++detReq;
+    $('detSearch').hidden=true;$('detBody').hidden=false;$('detBack').hidden=false;$('detTitle').textContent='Memuat…';
+    $('detBody').innerHTML='<p class="hint">Memuat data siswa…</p>';
+    let x;try{x=await authed('siswa_detail',{p_sid:sid});}catch(e){$('detTitle').textContent='Data siswa';$('detBody').innerHTML=`<p class="err">${esc(e.message)}</p>`;return;}
+    if(my!==detReq)return;
+    $('detTitle').textContent=x.name;
+    const hadirSet=new Set(x.hadir||[]), lap=x.laporan||[];
+    const statusHari=dd=>{
+      if(hadirSet.has(dd))return 'hadir';
+      const l=lap.find(r=>r.status==='diterima'&&r.dari<=dd&&r.sampai>=dd);if(l)return l.jenis;
+      return '';};
+    // hari sekolah (Senin–Jumat) 30 hari terakhir
+    const days=[];for(let i=0;i<30;i++){const dd=addDays(x.hari,-i);const w=tglID(dd).getDay();if(w>0&&w<6)days.push(dd);}
+    const cnt={hadir:0,sakit:0,izin:0,alpa:0,kosong:0};days.forEach(dd=>{const st=statusHari(dd)||'kosong';cnt[st]++;});
+    const today=statusHari(x.hari);
+    const lampList=lap.filter(r=>r.lampiran);
+    const hpTxt=x.hp?('0'+String(x.hp).slice(2)).replace(/(\d{4})(\d{4})(\d+)/,'$1 $2 $3'):'–';
+    $('detBody').innerHTML=`<div class="det">
+      <div class="det-id">
+        <div><small>NIS</small><b class="mono">${esc(x.nis)}</b></div>
+        <div><small>Kelas</small><b>${esc(x.kelas)}</b></div>
+        <div><small>Wali kelas</small>${esc(x.wali||'–')}</div>
+        <div><small>No. WA orang tua</small><span class="mono">${esc(hpTxt)}</span></div>
+        <div><small>Hari ini</small>${today?`<span class="pill ${today}">${today==='hadir'?'Hadir':LBL[today]}</span>`:'<span class="pill wait">Belum ada kabar</span>'}</div>
+        <div><small>Data wajah</small>${x.wajah?`<span class="pill hadir">Terdaftar</span><div class="sub">${esc(x.wajah.at)} · persetujuan: ${esc(x.wajah.persetujuan)}</div>`:'<span class="pill wait">Belum didaftarkan</span>'}</div>
+      </div>
+      <p class="hint" style="margin:0">🔒 Hadirin tidak menyimpan foto wajah siswa, hanya 128 angka ciri wajah yang terenkripsi. Foto yang ada di bawah adalah lampiran surat.</p>
+      <div><h3>30 hari terakhir (hari sekolah)</h3>
+        <div class="tiles">${[['Hadir','hadir','var(--hadir)'],['Sakit','sakit','var(--sakit)'],['Izin','izin','var(--izin)'],['Alpa','alpa','var(--alpa)']].map(([l,k,c])=>`<div class="tile" style="--accent:${c}"><span class="lbl">${l}</span><span class="num">${cnt[k]}</span><span class="note">hari</span></div>`).join('')}</div>
+        <p class="hint" style="margin:6px 0 0">${cnt.kosong?`${cnt.kosong} hari tanpa catatan (tidak terscan dan tidak ada laporan).`:''}</p></div>
+      <div><h3>Kalender kehadiran</h3><div class="cal">${days.slice(0,20).map(dd=>{const st=statusHari(dd);
+        return `<span class="${st||'kosong'}" title="${esc(dd)}"><b>${esc(fmtTgl(dd))}</b>${st==='hadir'?'Hadir':st?LBL[st]:'–'}</span>`;}).join('')}</div></div>
+      <div><h3>Foto surat &amp; lampiran (${lampList.length})</h3>${lampList.length?`<div class="gal" id="detGal">${lampList.map(r=>`<button type="button" data-lamp="${esc(r.id)}" title="${esc(r.file)}"><span class="pdf" data-ph="${esc(r.id)}">${/\.pdf$/i.test(r.file)?'📄':'⏳'}</span><small>${esc(fmtTgl(r.dari))} · ${esc(r.file)}</small></button>`).join('')}</div>`:'<p class="hint" style="margin:0">Belum ada lampiran surat untuk siswa ini.</p>'}</div>
+      <div><h3>Riwayat laporan (${lap.length})</h3>${lap.length?`<div class="tablewrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Status</th><th>Lampiran</th></tr></thead><tbody>${lap.map(r=>`<tr>
+        <td class="mono" style="white-space:nowrap">${esc(fmtTgl(r.dari))}${r.sampai!==r.dari?' – '+esc(fmtTgl(r.sampai)):''}</td>
+        <td><span class="pill ${esc(r.jenis)}">${LBL[r.jenis]}</span></td>
+        <td><div class="ket">${esc(r.ket)}</div><div class="sub">${esc(r.pelapor||'')}</div></td>
+        <td>${r.status==='masuk'?'<span class="pill wait">Menunggu wali kelas</span>':'<span class="pill hadir">Diterima</span>'}${r.verif?`<div class="sub">Surat: ${esc(r.verif)}${r.alasan?' · '+esc(r.alasan):''}</div>`:''}</td>
+        <td class="mono">${fileBtn(r)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="hint" style="margin:0">Belum ada laporan sakit/izin/alpa.</p>'}</div>
+    </div>`;
+    // muat pratinjau foto satu per satu (maks 12) supaya ringan
+    for(const r of lampList.slice(0,12)){
+      if(/\.pdf$/i.test(r.file))continue;
+      try{const a=await authed('lampiran_get',{p_id:r.id});if(my!==detReq)return;
+        if(!/^image\//.test(a.mime)){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='📄';continue;}
+        const bin=atob(a.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+        const url=URL.createObjectURL(new Blob([u],{type:a.mime}));detUrls.push(url);
+        const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph){const img=new Image();img.src=url;img.alt='Lampiran '+r.file;ph.replaceWith(img);}
+      }catch(_){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='⚠️';}
+    }
+  }
 
   /* ---------- Kamera kelas: scan wajah (face-api.js / TensorFlow.js, model CNN) ----------
      Deteksi: TinyFaceDetector (CNN), 68 titik wajah, pengenal: ResNet-34 -> descriptor 128 angka.

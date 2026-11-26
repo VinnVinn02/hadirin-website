@@ -2,6 +2,16 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.14.0] — 2026-11-26
+### Ditambahkan
+- **Ubah kelas akun guru** (Admin, menu Pengguna): pilih kelas langsung di tabel, atau "Tanpa kelas" untuk melepas.
+  Satu kelas tetap hanya boleh punya satu wali kelas aktif; nama wali kelas yang masih kosong diisi otomatis;
+  akun yang diubah diminta login ulang. Migrasi `20261126020000_ubah-kelas-guru.sql` (RPC `user_kelas_set`).
+
+### Diubah
+- Data contoh di database produksi dihapus (siswa, kelas, laporan, kehadiran, wajah, log); data contoh harian dimatikan.
+  Akun login dipertahankan.
+
 ## [0.13.0] — 2026-11-26
 ### Ditambahkan
 - **🔍 Cari siswa** (tombol di header, semua peran; guru hanya kelasnya sendiri): cari dengan NIS atau nama.

@@ -426,6 +426,7 @@ tbody tr:hover{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
 input,select,textarea{border-radius:11px}
 @media (hover:none){.tile:hover{transform:none}.queue li button:hover{transform:none}.btn.primary:hover{transform:none}}
 /* Data siswa */
+.ukelas{font:inherit;font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);max-width:170px}
 .steps-sm{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 #sbody .num,#kbody .num{text-align:right}
 .imp-skip{margin:6px 0 0;padding-left:18px;font-size:12px;max-height:140px;overflow:auto}

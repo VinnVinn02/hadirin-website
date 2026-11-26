@@ -641,7 +641,7 @@
     $('ubody').innerHTML=users.map(u=>`<tr>
       <td><b>${esc(u.name)}</b><div class="sub mono">${esc(u.u)}</div></td>
       <td><span class="pill ${esc(u.role)}">${ROLE[u.role]}</span></td>
-      <td>${u.kelas?esc(u.kelas):'<span class="sub">–</span>'}</td>
+      <td>${u.role==='guru'?`<select class="ukelas" data-ukelas="${esc(u.u)}" aria-label="Kelas wali untuk ${esc(u.u)}"><option value="">– Tanpa kelas –</option>${kelasAll.map(k=>`<option${k===u.kelas?' selected':''}>${esc(k)}</option>`).join('')}</select>${u.kelas?'':'<div class="sub">Belum bisa memakai menu Pelaporan</div>'}`:(u.kelas?esc(u.kelas):'<span class="sub">–</span>')}</td>
       <td>${u.active?'<span class="pill hadir">Aktif</span>':'<span class="pill wait">Nonaktif</span>'}${u.temp?'<div class="sub">Wajib ganti sandi</div>':u.nopw?'<div class="sub">Belum punya sandi</div>':''}</td>
       <td class="mono">${esc(u.last)}</td>
       <td style="white-space:nowrap">${session&&u.u===session.u?'<span class="sub">Akun Anda</span>':`<span style="display:flex;gap:6px"><button class="btn small" type="button" data-tog="${esc(u.u)}">${u.active?'Nonaktifkan':'Aktifkan'}</button><button class="btn small" type="button" data-rpw="${esc(u.u)}">${u.nopw?'Buat sandi':'Reset sandi'}</button></span>`}</td></tr>`).join('');
@@ -658,6 +658,16 @@
     ];
     $('pbody').innerHTML=rowsP.map(([f,...a])=>`<tr><td>${f}</td>${a.map(v=>`<td>${v?'<span class="check">✓ Bisa</span>':'<span class="cross">–</span>'}</td>`).join('')}</tr>`).join('');
   }
+  $('ubody').addEventListener('change',async e=>{
+    const sel=e.target.closest('select[data-ukelas]');if(!sel)return;
+    const uid=sel.dataset.ukelas, u=users.find(x=>x.u===uid), k=sel.value;
+    const msg=k?`Jadikan ${uid} wali kelas ${k}?`:`Lepaskan ${uid} dari kelas ${u&&u.kelas||''}?`;
+    if(!confirm(msg+' Akun itu akan diminta login ulang.')){sel.value=u&&u.kelas||'';return;}
+    sel.disabled=true;
+    try{await authed('user_kelas_set',{p_uid:uid,p_kelas:k||null});toast(k?`${uid} sekarang wali kelas ${k}.`:`${uid} dilepas dari kelas.`,'ok');}
+    catch(ex){toast(ex.message,'warn');sel.value=u&&u.kelas||'';}
+    finally{sel.disabled=false;refresh(true);}
+  });
   $('ubody').addEventListener('click',async e=>{
     const r=e.target.closest('button[data-rpw]');
     if(r){const uid=r.dataset.rpw;if(!confirm(`Buat kata sandi sementara baru untuk ${uid}? Kata sandi lama langsung tidak berlaku dan sesi akun itu diputus.`))return;

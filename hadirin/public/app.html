@@ -59,11 +59,6 @@
       <p class="err" id="loginErr" hidden role="alert"></p>
       <div class="lockbar" id="lockBar" hidden role="status"></div>
       <button class="btn primary big" type="submit" id="loginBtn">Masuk</button>
-      <details class="demo">
-        <summary>Akun demo prototipe</summary>
-        <span class="hint">Klik untuk mengisi otomatis. Hanya untuk mencoba, bukan untuk data sungguhan.</span>
-        <div class="demo-list" id="demoList"></div>
-      </details>
       <div class="parentcta">
         <span><b>Orang tua atau wali?</b><span class="hint" style="display:block">Lapor anak sakit/izin, atau cek status laporan, tanpa login.</span></span>
         <button class="btn small" type="button" id="toParent">Buka form lapor</button>
@@ -224,9 +219,6 @@
   </header>
   <nav class="tabs" aria-label="Menu utama"><div class="wrap" id="tabs"></div></nav>
 
-  <div class="wrap">
-    <p class="sample">Prototipe dengan data contoh yang tersimpan di server (Supabase) dan diperbarui otomatis setiap hari.</p>
-  </div>
 
   <main class="wrap" id="mainContent" tabindex="-1">
     <!-- ===== Pelaporan ===== -->
@@ -561,11 +553,6 @@
             <tbody id="pbody"></tbody>
           </table>
         </div>
-      </div>
-      <div class="panel danger-zone">
-        <div><div class="eyebrow">Data demo</div><h2>Kembalikan ke kondisi awal</h2></div>
-        <p class="hint" style="margin:0">Menghapus akun, laporan, lampiran, dan log yang dibuat selama mencoba demo. Berlaku untuk semua pengguna karena data tersimpan di server.</p>
-        <div class="actions" style="justify-content:flex-start"><button class="btn danger" type="button" id="resetDemo">Reset data demo</button></div>
       </div>
     </section>
 

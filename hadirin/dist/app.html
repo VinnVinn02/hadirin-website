@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-ZkXwlxMQewgYRvMkFYuO0iU+LZlnuFijXzsx9XlxT+k='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-+2hP2Z5EIFKs+e0xvyut6Hek8Zj6eoqvdhLlmpbM2+M='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://pzhlreyseedjkgzevuun.supabase.co; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; upgrade-insecure-requests">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hadirin — Absensi Wajah &amp; Pelaporan</title>
 <meta name="description" content="Hadirin: sistem absensi wajah dengan pelaporan sakit/izin dari orang tua, login Admin/TU/Guru, dan rekap sekolah.">
@@ -493,11 +493,6 @@ input,select,textarea{border-radius:11px}
       <p class="err" id="loginErr" hidden role="alert"></p>
       <div class="lockbar" id="lockBar" hidden role="status"></div>
       <button class="btn primary big" type="submit" id="loginBtn">Masuk</button>
-      <details class="demo">
-        <summary>Akun demo prototipe</summary>
-        <span class="hint">Klik untuk mengisi otomatis. Hanya untuk mencoba, bukan untuk data sungguhan.</span>
-        <div class="demo-list" id="demoList"></div>
-      </details>
       <div class="parentcta">
         <span><b>Orang tua atau wali?</b><span class="hint" style="display:block">Lapor anak sakit/izin, atau cek status laporan, tanpa login.</span></span>
         <button class="btn small" type="button" id="toParent">Buka form lapor</button>
@@ -658,9 +653,6 @@ input,select,textarea{border-radius:11px}
   </header>
   <nav class="tabs" aria-label="Menu utama"><div class="wrap" id="tabs"></div></nav>
 
-  <div class="wrap">
-    <p class="sample">Prototipe dengan data contoh yang tersimpan di server (Supabase) dan diperbarui otomatis setiap hari.</p>
-  </div>
 
   <main class="wrap" id="mainContent" tabindex="-1">
     <!-- ===== Pelaporan ===== -->
@@ -996,11 +988,6 @@ input,select,textarea{border-radius:11px}
           </table>
         </div>
       </div>
-      <div class="panel danger-zone">
-        <div><div class="eyebrow">Data demo</div><h2>Kembalikan ke kondisi awal</h2></div>
-        <p class="hint" style="margin:0">Menghapus akun, laporan, lampiran, dan log yang dibuat selama mencoba demo. Berlaku untuk semua pengguna karena data tersimpan di server.</p>
-        <div class="actions" style="justify-content:flex-start"><button class="btn danger" type="button" id="resetDemo">Reset data demo</button></div>
-      </div>
     </section>
 
     <!-- Log, tampil di semua peran -->
@@ -1197,7 +1184,6 @@ input,select,textarea{border-radius:11px}
 
   /* ---------- Akun & peran ---------- */
   const ROLE={admin:'Admin',tu:'TU',guru:'Guru'};
-  const demo=[['admin','admin123','admin'],['tu.sari','tu123','tu'],['guru.firman','guru123','guru']];
   const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],siswa:['admin','tu'],users:['admin']};
   const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['siswa','Data siswa'],['users','Pengguna']];
   let session=null, token=null, view='lapor';
@@ -1211,9 +1197,6 @@ input,select,textarea{border-radius:11px}
   }
 
   /* ---------- Login ---------- */
-  $('demoList').innerHTML=demo.map(([u,p,r])=>`<button type="button" data-u="${u}" data-p="${p}">${ROLE[r]}: ${u} / ${p}</button>`).join('');
-  $('demoList').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-    $('uid').value=b.dataset.u;$('upw').value=b.dataset.p;$('loginErr').hidden=true;$('loginBtn').focus();});
   $('pwToggle').addEventListener('click',e=>{const i=$('upw');const show=i.type==='password';i.type=show?'text':'password';e.target.textContent=show?'Sembunyi':'Lihat';e.target.setAttribute('aria-pressed',show);});
 
   // Penguncian ditentukan server; browser hanya menampilkan hitung mundurnya
@@ -2358,14 +2341,6 @@ input,select,textarea{border-radius:11px}
   });
   $('exportLog').addEventListener('click',()=>{download(`log-audit-${todayISO}.csv`,[['Waktu','Aktivitas','Cakupan'],...log.map(l=>[l.t,l.m,l.scope])]);toast('Log audit diunduh.','ok');});
   $('printRekap').addEventListener('click',()=>window.print());
-  $('resetDemo').addEventListener('click',async e=>{
-    if(!confirm('Kembalikan SEMUA data demo di server ke kondisi awal? Akun, laporan, lampiran, dan log yang dibuat akan hilang untuk semua pengguna.'))return;
-    const ok=await act(e.currentTarget,()=>authed('reset_demo').then(()=>true));
-    if(!ok)return;
-    try{session=await authed('sesi_cek');}catch(_){return;}
-    clearSelection();resetForm();toast('Data demo dikembalikan ke kondisi awal.','ok');refresh(true);
-  });
-
   /* ---------- Navigasi hash: #lapor, #lapor?k=KELAS, #cek ---------- */
   function route(){
     const h=location.hash;

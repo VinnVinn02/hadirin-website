@@ -12,7 +12,7 @@ antrean laporan untuk wali kelas, verifikasi surat oleh TU, rekap sekolah, dan k
 ## Daftar isi
 - [Fitur](#fitur)
 - [Alur pelaporan](#alur-pelaporan)
-- [Akun demo](#akun-demo)
+- [Akun awal](#akun-awal)
 - [Struktur folder](#struktur-folder)
 - [Menjalankan di laptop](#menjalankan-di-laptop)
 - [Deploy ke VPS dan domain baru](#deploy-ke-vps-dan-domain-baru)
@@ -83,18 +83,16 @@ Satu laporan cukup diisi sekali oleh orang tua. Guru hanya mengonfirmasi, dan TU
 
 ---
 
-## Akun demo
+## Akun awal
 
-| Peran | ID | Kata sandi |
-|---|---|---|
-| Admin | `admin` | `admin123` |
-| TU | `tu.sari` | `tu123` |
-| Guru (wali XI IPA 1) | `guru.firman` | `guru123` |
+Database baru dipasang dengan beberapa akun awal (ID `admin`, `tu.sari`, `guru.firman`) yang sandinya tertulis
+di file migrasi publik. **Segera setelah memasang database:**
 
-Untuk mencoba form orang tua, gunakan siswa **Joko Wibowo** dengan NIS **1110**.
-Siswa lain yang belum hadir: Lutfi Hakim (`1112`) dan Naufal Rizky (`1114`).
+1. Login sebagai `admin`, lalu ganti sandinya lewat **Ganti sandi**.
+2. Di menu **Pengguna**, tekan **Reset sandi** untuk akun lain (sandi sementara acak, wajib diganti saat login pertama),
+   atau **Nonaktifkan** akun yang tidak dipakai.
 
-> ⚠️ Akun demo tertulis di kode front-end. **Jangan gunakan prototipe ini untuk data siswa sungguhan** sebelum backend dibuat (lihat [Keamanan](#keamanan)).
+Sandi tidak pernah dicantumkan di dokumentasi ini.
 
 ---
 

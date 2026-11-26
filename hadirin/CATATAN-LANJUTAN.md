@@ -23,15 +23,11 @@ Hadirin adalah web absensi sekolah. Isinya:
 | Database | Supabase, proyek **hadirin** (`pzhlreyseedjkgzevuun`, server Tokyo) di organisasi "VinnVinn02's OrgHadirin" (Free) |
 | Folder proyek | `Downloads\hadirin\hadirin` |
 
-## 2. Akun demo (GANTI sebelum dipakai sungguhan)
+## 2. Akun
 
-| Peran | ID | Sandi |
-|---|---|---|
-| Admin | `admin` | `admin123` |
-| TU | `tu.sari` | `tu123` |
-| Guru (wali XI IPA 1) | `guru.firman` | `guru123` |
-
-`guru.rahma` dan `guru.budi` belum punya sandi. Admin bisa membuatkannya lewat **Pengguna → Buat sandi**.
+Akun: `admin`, `tu.sari`, `guru.firman`, `guru.rahma`, `guru.budi`. Sandi TIDAK ditulis di sini (repo publik).
+Ganti sandi admin lewat **Ganti sandi**; akun lain lewat **Pengguna → Reset sandi**. Tombol "Reset data demo"
+sudah dihapus dan fungsi `reset_demo` ditolak server (v0.15), karena dulu mengembalikan sandi admin ke sandi demo.
 
 ## 3. Struktur file
 

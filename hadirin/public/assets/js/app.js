@@ -128,7 +128,6 @@
 
   /* ---------- Akun & peran ---------- */
   const ROLE={admin:'Admin',tu:'TU',guru:'Guru'};
-  const demo=[['admin','admin123','admin'],['tu.sari','tu123','tu'],['guru.firman','guru123','guru']];
   const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],siswa:['admin','tu'],users:['admin']};
   const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['siswa','Data siswa'],['users','Pengguna']];
   let session=null, token=null, view='lapor';
@@ -142,9 +141,6 @@
   }
 
   /* ---------- Login ---------- */
-  $('demoList').innerHTML=demo.map(([u,p,r])=>`<button type="button" data-u="${u}" data-p="${p}">${ROLE[r]}: ${u} / ${p}</button>`).join('');
-  $('demoList').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-    $('uid').value=b.dataset.u;$('upw').value=b.dataset.p;$('loginErr').hidden=true;$('loginBtn').focus();});
   $('pwToggle').addEventListener('click',e=>{const i=$('upw');const show=i.type==='password';i.type=show?'text':'password';e.target.textContent=show?'Sembunyi':'Lihat';e.target.setAttribute('aria-pressed',show);});
 
   // Penguncian ditentukan server; browser hanya menampilkan hitung mundurnya
@@ -1289,14 +1285,6 @@
   });
   $('exportLog').addEventListener('click',()=>{download(`log-audit-${todayISO}.csv`,[['Waktu','Aktivitas','Cakupan'],...log.map(l=>[l.t,l.m,l.scope])]);toast('Log audit diunduh.','ok');});
   $('printRekap').addEventListener('click',()=>window.print());
-  $('resetDemo').addEventListener('click',async e=>{
-    if(!confirm('Kembalikan SEMUA data demo di server ke kondisi awal? Akun, laporan, lampiran, dan log yang dibuat akan hilang untuk semua pengguna.'))return;
-    const ok=await act(e.currentTarget,()=>authed('reset_demo').then(()=>true));
-    if(!ok)return;
-    try{session=await authed('sesi_cek');}catch(_){return;}
-    clearSelection();resetForm();toast('Data demo dikembalikan ke kondisi awal.','ok');refresh(true);
-  });
-
   /* ---------- Navigasi hash: #lapor, #lapor?k=KELAS, #cek ---------- */
   function route(){
     const h=location.hash;

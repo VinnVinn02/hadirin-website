@@ -2,6 +2,13 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.15.0] — 2026-11-26
+### Keamanan
+- Daftar akun demo (ID + sandi) dihapus dari halaman login, begitu juga banner "Prototipe dengan data contoh".
+- Tombol **Reset data demo** dihapus, dan fungsi `reset_demo` ditolak di server
+  (migrasi `20261126030000_matikan-reset-demo.sql`). Fungsi itu dulu mengembalikan sandi admin ke sandi demo.
+- Sandi demo dihapus dari README dan catatan proyek.
+
 ## [0.14.0] — 2026-11-26
 ### Ditambahkan
 - **Ubah kelas akun guru** (Admin, menu Pengguna): pilih kelas langsung di tabel, atau "Tanpa kelas" untuk melepas.

@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hadirin — Absensi Wajah &amp; Pelaporan</title>
+<meta name="description" content="Hadirin: sistem absensi wajah dengan pelaporan sakit/izin dari orang tua, login Admin/TU/Guru, dan rekap sekolah.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#174F42">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600;7..72,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="assets/js/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#mainContent">Lewati ke konten utama</a>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginView">
+  <div class="wrap login-grid">
+    <section class="hero" aria-label="Tentang Hadirin">
+      <div class="brand light">
+        <div class="logo">H</div>
+        <div><b>Hadirin</b><small>Smart Attendance · SMA Harapan Bangsa</small></div>
+      </div>
+      <h1>Absensi wajah dan laporan sakit/izin dalam satu tempat.</h1>
+      <p>Kamera mencatat siswa yang hadir. Orang tua melapor dari HP. Wali kelas cukup menerima, dan TU memverifikasi surat.</p>
+      <ul class="features">
+        <li><span>📷</span><b>Scan wajah</b> otomatis menandai hadir</li>
+        <li><span>📱</span><b>Form orang tua</b> tanpa login, dari link WA</li>
+        <li><span>✅</span><b>Verifikasi surat</b> oleh TU dengan alasan</li>
+        <li><span>📊</span><b>Rekap &amp; ekspor</b> ke Excel (CSV)</li>
+      </ul>
+    </section>
+
+    <form class="lcard" id="loginForm" novalidate>
+      <div class="lhead">
+        <div>
+          <div class="eyebrow">Masuk ke sistem</div>
+          <h2 class="ltitle">Login Hadirin</h2>
+        </div>
+        <button class="iconbtn" type="button" data-theme-btn aria-label="Ganti tema">◐</button>
+      </div>
+      <p class="lead small">Admin, TU, dan Guru masuk dari sini. Menu menyesuaikan peran akun secara otomatis.</p>
+      <div class="field">
+        <label for="uid">ID pengguna</label>
+        <input type="text" id="uid" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" placeholder="Masukkan ID">
+      </div>
+      <div class="field">
+        <label for="upw">Kata sandi</label>
+        <div class="pw">
+          <input type="password" id="upw" autocomplete="current-password" maxlength="128" placeholder="Masukkan kata sandi">
+          <button type="button" id="pwToggle" aria-pressed="false">Lihat</button>
+        </div>
+      </div>
+      <p class="err" id="loginErr" hidden role="alert"></p>
+      <div class="lockbar" id="lockBar" hidden role="status"></div>
+      <button class="btn primary big" type="submit" id="loginBtn">Masuk</button>
+      <details class="demo">
+        <summary>Akun demo prototipe</summary>
+        <span class="hint">Klik untuk mengisi otomatis. Hanya untuk mencoba, bukan untuk data sungguhan.</span>
+        <div class="demo-list" id="demoList"></div>
+      </details>
+      <div class="parentcta">
+        <span><b>Orang tua atau wali?</b><span class="hint" style="display:block">Lapor anak sakit/izin, atau cek status laporan, tanpa login.</span></span>
+        <button class="btn small" type="button" id="toParent">Buka form lapor</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= FORM ORANG TUA ================= -->
+<div id="parentView" hidden>
+  <div class="pbar" id="pBack" hidden>
+    <div class="wrap"><span>Form orang tua, seperti yang terbuka dari link WA.</span>
+      <span style="display:flex;gap:6px"><button class="iconbtn small" type="button" data-theme-btn aria-label="Ganti tema">◐</button><button class="btn small" type="button" id="backDash">Kembali ke dashboard</button></span></div>
+  </div>
+  <div class="wrap pwrap">
+    <div class="phone">
+      <div class="phead">
+        <div class="brand"><div class="logo">H</div><div><b>Lapor Sakit / Izin</b><small>SMA Harapan Bangsa · Kelas XI IPA 1</small></div></div>
+        <div class="pdate" id="pDate"></div>
+        <div class="ptabs" id="pTabs" role="tablist">
+          <button type="button" role="tab" data-pt="lapor" aria-selected="true">Lapor</button>
+          <button type="button" role="tab" data-pt="cek" aria-selected="false">Cek status</button>
+        </div>
+      </div>
+
+      <div id="pLapor">
+      <form id="pForm" class="pbody" novalidate>
+        <div class="step">
+          <span class="snum">1</span>
+          <div class="field">
+            <label for="pKelas">Kelas</label>
+            <select id="pKelas"><option value="">Memuat kelas…</option></select>
+            <label for="pChild" style="margin-top:10px">Nama anak</label>
+            <select id="pChild" disabled><option value="">Pilih kelas dulu</option></select>
+          </div>
+        </div>
+        <div class="step">
+          <span class="snum">2</span>
+          <div class="field">
+            <label for="pNis">4 angka terakhir NIS anak</label>
+            <input type="text" id="pNis" inputmode="numeric" maxlength="4" placeholder="Contoh: 1104" autocomplete="off">
+            <span class="hint">Untuk memastikan yang melapor benar keluarga siswa. NIS ada di kartu pelajar.</span>
+          </div>
+        </div>
+        <p class="pnote" id="pStatusNote" hidden></p>
+
+        <div class="step">
+          <span class="snum">3</span>
+          <fieldset>
+            <legend>Anak tidak masuk karena</legend>
+            <div class="choice">
+              <label class="sakit"><input type="radio" name="pjenis" value="sakit"><span class="t"><span class="dot" style="background:var(--sakit)"></span>Sakit</span></label>
+              <label class="izin"><input type="radio" name="pjenis" value="izin"><span class="t"><span class="dot" style="background:var(--izin)"></span>Izin</span></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="step">
+          <span class="snum">4</span>
+          <div class="field">
+            <label for="pKet">Keterangan</label>
+            <div class="chips" id="pChips"><span class="hint">Pilih Sakit atau Izin dulu, nanti muncul pilihan cepat.</span></div>
+            <textarea id="pKet" maxlength="300" placeholder="Tulis alasan singkat, misalnya: demam sejak semalam."></textarea>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="snum">5</span>
+          <div class="field">
+            <span class="flabel">Berapa hari tidak masuk?</span>
+            <div class="seg" id="pDays">
+              <button type="button" data-d="1" aria-pressed="true">Hari ini</button>
+              <button type="button" data-d="2" aria-pressed="false">2 hari</button>
+              <button type="button" data-d="3" aria-pressed="false">3 hari</button>
+              <button type="button" data-d="0" aria-pressed="false">Lainnya</button>
+            </div>
+            <div class="row2" id="pCustom" hidden>
+              <div class="field"><label for="pDari">Mulai</label><input type="date" id="pDari"></div>
+              <div class="field"><label for="pSampai">Sampai</label><input type="date" id="pSampai"></div>
+            </div>
+            <span class="hint" id="pRange"></span>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="snum">6</span>
+          <div class="field">
+            <span class="flabel">Foto surat <span class="hint" id="pFileReq">(opsional)</span></span>
+            <label class="upload" for="pFile">
+              <span id="pFileName">Ketuk untuk memotret atau memilih foto surat</span>
+              <input type="file" id="pFile" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment">
+            </label>
+            <img id="pPrev" class="pprev" alt="Pratinjau foto surat" hidden>
+            <span class="hint">JPG, PNG, WEBP, atau PDF. Maksimal 5 MB.</span>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="snum">7</span>
+          <div class="field">
+            <span class="flabel">Pelapor</span>
+            <div class="row2">
+              <select id="pRel" aria-label="Hubungan dengan siswa"><option>Ibu</option><option>Ayah</option><option>Wali</option></select>
+              <input type="text" id="pName" maxlength="60" placeholder="Nama Anda" aria-label="Nama pelapor" autocomplete="name">
+            </div>
+          </div>
+        </div>
+
+        <!-- Honeypot anti-bot: disembunyikan dari manusia -->
+        <div class="hp" aria-hidden="true"><label for="pWeb">Website</label><input type="text" id="pWeb" tabindex="-1" autocomplete="off"></div>
+
+        <p class="err" id="pErr" hidden role="alert"></p>
+        <button class="btn primary big" type="submit">Kirim laporan</button>
+        <p class="hint" style="text-align:center;margin:0">Laporan dikirim ke wali kelas M. Firmansyah, S.Pd. Simpan nomor laporan untuk mengecek statusnya.</p>
+      </form>
+
+      <div class="pbody pdone" id="pDone" hidden>
+        <div class="tick" aria-hidden="true">✓</div>
+        <h2 style="text-align:center">Laporan terkirim</h2>
+        <div class="receipt" id="pReceipt"></div>
+        <p class="hint" style="text-align:center;margin:0">Status berubah menjadi <b>Diterima</b> setelah wali kelas memeriksanya.</p>
+        <div class="row2"><button class="btn" type="button" id="pCekBtn">Cek status</button><button class="btn" type="button" id="pAgain">Lapor anak lain</button></div>
+      </div>
+      </div>
+
+      <div id="pCek" hidden>
+        <form id="cForm" class="pbody" novalidate>
+          <div class="field">
+            <label for="cNo">Nomor laporan</label>
+            <input type="text" id="cNo" class="mono" maxlength="16" placeholder="HDR-261118-AB3CD" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <span class="hint">Nomor ada di bukti setelah laporan dikirim.</span>
+          </div>
+          <button class="btn primary" type="submit">Cek status</button>
+          <div id="cResult" hidden></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="appView" hidden>
+  <header class="band">
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo">H</div>
+        <div><b>Hadirin</b><small>Smart Attendance · SMA Harapan Bangsa</small></div>
+      </div>
+      <div class="userbox">
+        <span class="av" id="uAv"></span>
+        <span><span class="uname" id="uName"></span> <span class="pill" id="uRole"></span><span class="usub" id="uSub" style="display:block"></span></span>
+        <button class="iconbtn onband" type="button" data-theme-btn aria-label="Ganti tema">◐</button>
+        <button class="btn small" type="button" id="cariBtn">🔍 Cari siswa</button>
+        <button class="btn small" type="button" id="pwBtn">Ganti sandi</button>
+        <button class="btn small" type="button" id="logoutBtn">Keluar</button>
+      </div>
+    </div>
+  </header>
+  <nav class="tabs" aria-label="Menu utama"><div class="wrap" id="tabs"></div></nav>
+
+  <div class="wrap">
+    <p class="sample">Prototipe dengan data contoh yang tersimpan di server (Supabase) dan diperbarui otomatis setiap hari.</p>
+  </div>
+
+  <main class="wrap" id="mainContent" tabindex="-1">
+    <!-- ===== Pelaporan ===== -->
+    <section class="view" id="v-lapor">
+      <div>
+        <div class="eyebrow">Pelaporan ketidakhadiran</div>
+        <h1>Siapa yang belum hadir hari ini?</h1>
+        <p class="lead">Siswa yang tidak terdeteksi kamera masuk antrean di bawah. Pilih siswa, tentukan Sakit atau Izin, lalu isi keterangannya.</p>
+        <div class="meta" style="margin-top:10px"><span id="todayLbl">Hari ini</span><span id="kelasLbl">Kelas XI IPA 1</span><label class="kelassel" id="kelasWrap" hidden>Kelas <select id="kelasSel" aria-label="Pilih kelas"></select></label><span class="sync" id="syncLbl" title="Data tersimpan di server">● Tersambung</span><span>Batas lapor <b id="cutoffLbl">09.00</b></span></div>
+      </div>
+
+      <div class="tiles" aria-label="Ringkasan hari ini" id="tiles"></div>
+
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-head">
+            <div><div class="eyebrow">Antrean</div><h2>Siswa yang belum hadir</h2><span class="hint" id="qCount"></span></div>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn small primary" id="acceptAll" type="button" hidden>Terima semua kabar orang tua</button>
+              <button class="btn small" id="bulkAlpa" type="button">Tandai sisa sebagai Alpa</button>
+            </span>
+          </div>
+          <div class="search"><input type="search" id="qSearch" placeholder="Cari nama atau 4 angka NIS…" aria-label="Cari siswa di antrean"></div>
+          <div class="linkcard">
+            <span style="min-width:0"><b>Orang tua lapor sendiri</b><span class="hint" style="display:block">Bagikan link ini di grup WA kelas. Laporan masuk ke antrean dan cukup diterima.</span>
+            <span class="mono" id="parentLink">hadirin.sch.id/lapor/xi-ipa-1</span></span>
+            <span style="display:flex;gap:6px"><button class="btn small" type="button" id="openParent">Lihat form</button><button class="btn small" type="button" id="copyLink">Salin link</button></span>
+          </div>
+          <div id="bulkConfirm" hidden class="who confirm" style="justify-content:space-between;flex-wrap:wrap">
+            <span id="bulkMsg"></span>
+            <span style="display:flex;gap:6px"><button class="btn small" id="bulkNo" type="button">Batal</button><button class="btn small primary" id="bulkYes" type="button">Ya, tandai Alpa</button></span>
+          </div>
+          <ul class="queue" id="queue"></ul>
+        </div>
+
+        <form class="panel sticky" id="form" novalidate>
+          <div><div class="eyebrow">Formulir laporan</div><h2 id="formTitle">Pilih siswa dari antrean</h2></div>
+          <div class="who" id="who" hidden></div>
+          <fieldset>
+            <legend>Alasan tidak hadir</legend>
+            <div class="choice">
+              <label class="sakit"><input type="radio" name="jenis" value="sakit" id="jSakit">
+                <span class="t"><span class="dot" style="background:var(--sakit)"></span>Sakit</span>
+                <span class="d">Siswa tidak dapat hadir karena kondisi kesehatan</span></label>
+              <label class="izin"><input type="radio" name="jenis" value="izin" id="jIzin">
+                <span class="t"><span class="dot" style="background:var(--izin)"></span>Izin</span>
+                <span class="d">Keperluan keluarga, lomba, atau urusan lain</span></label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="ket">Keterangan</label>
+            <div class="chips" id="chips"></div>
+            <textarea id="ket" maxlength="300"></textarea>
+            <div class="counter" id="counter">0/300</div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="dari">Mulai</label><input type="date" id="dari"></div>
+            <div class="field"><label for="sampai">Sampai</label><input type="date" id="sampai"></div>
+          </div>
+          <div class="field">
+            <span class="flabel">Lampiran surat <span class="hint">(opsional, wajib bila sakit lebih dari 2 hari)</span></span>
+            <div class="drop"><input type="file" id="file" accept="image/jpeg,image/png,image/webp,application/pdf"><span id="fileName">Foto surat dokter atau surat orang tua</span></div>
+          </div>
+          <div class="field">
+            <label for="pelapor">Dilaporkan oleh</label>
+            <select id="pelapor">
+              <option>Orang tua / wali (via telepon)</option>
+              <option>Orang tua / wali (via WhatsApp)</option>
+              <option>Siswa sendiri</option>
+              <option>Wali kelas</option>
+              <option>Petugas TU</option>
+            </select>
+          </div>
+          <label class="toggle"><input type="checkbox" id="notif" checked> Kirim konfirmasi ke orang tua setelah disimpan</label>
+          <p class="err" id="err" hidden role="alert"></p>
+          <div class="actions">
+            <button class="btn" type="button" id="resetBtn">Kosongkan</button>
+            <button class="btn primary" type="submit" id="saveBtn">Simpan laporan</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Rekap</div><h2>Laporan hari ini</h2></div>
+          <div class="filters" id="filters">
+            <button class="btn small" type="button" data-f="all" aria-pressed="true">Semua</button>
+            <button class="btn small" type="button" data-f="sakit" aria-pressed="false">Sakit</button>
+            <button class="btn small" type="button" data-f="izin" aria-pressed="false">Izin</button>
+            <button class="btn small" type="button" data-f="alpa" aria-pressed="false">Alpa</button>
+            <button class="btn small" type="button" id="exportDay">⬇ Ekspor CSV</button>
+          </div>
+        </div>
+        <div class="search"><input type="search" id="tSearch" placeholder="Cari di laporan hari ini…" aria-label="Cari laporan"></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Siswa</th><th>Status</th><th>Keterangan</th><th>Periode</th><th>Pelapor</th><th></th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div class="panel">
+          <div><div class="eyebrow">Minggu lalu</div><h2>Ketidakhadiran per hari</h2></div>
+          <div class="legend">
+            <span><i class="dot" style="background:var(--sakit)"></i>Sakit</span>
+            <span><i class="dot" style="background:var(--izin)"></i>Izin</span>
+            <span><i class="dot" style="background:var(--alpa)"></i>Alpa</span>
+          </div>
+          <svg id="chart" viewBox="0 0 420 200" role="img" aria-label="Grafik batang bertumpuk ketidakhadiran Senin sampai Jumat" style="width:100%;height:auto"></svg>
+        </div>
+        <div class="panel">
+          <div><div class="eyebrow">Perlu perhatian</div><h2>Pola ketidakhadiran bulan ini</h2></div>
+          <ul class="watch" id="watch"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Kamera kelas: absensi scan wajah ===== -->
+    <section class="view" id="v-kamera" hidden>
+      <div>
+        <div class="eyebrow">Absensi scan wajah</div>
+        <h1>Kamera kelas</h1>
+        <p class="lead">Kamera mengenali wajah siswa dengan model CNN yang berjalan di perangkat ini. Foto tidak dikirim ke server, yang disimpan hanya 128 angka ciri wajah.</p>
+        <div class="meta" style="margin-top:10px"><span id="camKelas">Kelas</span><span id="camCount">0 wajah terdaftar</span><span id="camHadir">Hadir 0</span></div>
+      </div>
+      <div class="grid3">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="seg" id="camMode" role="tablist" aria-label="Mode kamera">
+              <button type="button" data-m="absen" aria-pressed="true">Absensi</button>
+              <button type="button" data-m="daftar" aria-pressed="false">Daftarkan wajah</button>
+            </div>
+            <span style="display:flex;gap:6px"><button class="btn small primary" type="button" id="camStart">▶ Mulai kamera</button><button class="btn small" type="button" id="camStop" hidden>■ Hentikan</button></span>
+          </div>
+          <div class="cam" id="camBox">
+            <video id="camVideo" playsinline muted></video>
+            <canvas id="camCanvas" aria-hidden="true"></canvas>
+            <div class="camflash" id="camFlash" aria-hidden="true" hidden><span class="ck">✓</span><span><b id="camFlashName"></b><small id="camFlashSub">hadir</small></span></div>
+            <div class="camoff" id="camOff"><span class="big">📷</span><span>Kamera belum aktif</span><span class="hint">Model ±7 MB diunduh sekali saat pertama kali dipakai.</span></div>
+          </div>
+          <p class="camstatus" id="camStatus" role="status">Tekan “Mulai kamera”. Izinkan akses kamera jika browser meminta.</p>
+          <p class="hint" style="margin:0">Tips: cahaya cukup dari depan, satu per satu menghadap kamera, lalu <b>berkedip</b> sekali untuk konfirmasi (mencegah curang pakai foto).</p>
+        </div>
+
+        <div class="panel" id="camAbsenPanel">
+          <div><div class="eyebrow">Baru tercatat</div><h2>Hadir lewat kamera</h2></div>
+          <ul class="log" id="camLog"><li class="empty">Belum ada yang tercatat di sesi ini.</li></ul>
+        </div>
+
+        <div class="panel" id="camDaftarPanel" hidden>
+          <div><div class="eyebrow">Pendaftaran wajah</div><h2>Daftarkan wajah siswa</h2></div>
+          <div class="field"><label for="enSiswa">Siswa</label><select id="enSiswa"></select></div>
+          <div class="field"><label for="enOrtu">Persetujuan orang tua/wali</label><input type="text" id="enOrtu" maxlength="80" placeholder="Nama orang tua/wali yang menyetujui">
+            <label class="toggle"><input type="checkbox" id="enSetuju"> Orang tua/wali sudah setuju data wajah anak dipakai untuk absensi</label></div>
+          <div class="enprog"><div class="bar"><i id="enBar" style="width:0%"></i></div><span class="mono" id="enN">0/3 sampel</span></div>
+          <p class="err" id="enErr" hidden role="alert"></p>
+          <div class="actions" style="justify-content:flex-start">
+            <button class="btn" type="button" id="enShot">📸 Ambil sampel otomatis</button>
+            <button class="btn" type="button" id="enReset">Ulangi</button>
+            <button class="btn primary" type="button" id="enSave" disabled>Simpan wajah</button>
+          </div>
+          <div><div class="eyebrow" style="margin-top:6px">Sudah terdaftar</div><ul class="enlist" id="enList"></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Verifikasi surat (TU, Admin) ===== -->
+    <section class="view" id="v-verif" hidden>
+      <div>
+        <div class="eyebrow">Tata Usaha</div>
+        <h1>Verifikasi surat izin dan sakit</h1>
+        <p class="lead">Cek lampiran yang dikirim orang tua atau wali kelas. Laporan yang disetujui masuk ke arsip resmi dan rapor kehadiran.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Antrean verifikasi</div><h2 id="verifCount">Surat masuk</h2></div>
+          <div class="filters" id="vfilters">
+            <button class="btn small" type="button" data-v="menunggu" aria-pressed="true">Menunggu</button>
+            <button class="btn small" type="button" data-v="disetujui" aria-pressed="false">Disetujui</button>
+            <button class="btn small" type="button" data-v="ditolak" aria-pressed="false">Ditolak</button>
+          </div>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Siswa</th><th>Status</th><th>Keterangan</th><th>Lampiran</th><th>Diajukan</th><th></th></tr></thead>
+            <tbody id="vbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Rekap sekolah (TU, Admin) ===== -->
+    <section class="view" id="v-rekap" hidden>
+      <div>
+        <div class="eyebrow">Rekap sekolah</div>
+        <h1>Kehadiran semua kelas hari ini</h1>
+        <p class="lead">Kelas dengan banyak siswa belum lapor ditandai supaya wali kelasnya bisa diingatkan sebelum batas jam.</p>
+      </div>
+      <div class="tiles" id="rtiles"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Per kelas</div><h2>Ringkasan kelas</h2></div>
+          <span class="filters noprint">
+            <button class="btn small" type="button" id="remindBtn">Ingatkan wali kelas yang belum lengkap</button>
+            <button class="btn small" type="button" id="exportRekap">⬇ Ekspor CSV</button>
+            <button class="btn small" type="button" id="printRekap">🖨 Cetak / PDF</button>
+          </span>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Kelas</th><th>Wali kelas</th><th class="num">Siswa</th><th class="num">Hadir</th><th class="num">Sakit</th><th class="num">Izin</th><th class="num">Alpa</th><th class="num">Belum lapor</th><th>Kehadiran</th></tr></thead>
+            <tbody id="rbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Data siswa & kelas (Admin + TU) ===== -->
+    <section class="view" id="v-siswa" hidden>
+      <div>
+        <div class="eyebrow">Data sekolah</div>
+        <h1>Data siswa dan kelas</h1>
+        <p class="lead">Tambah, ubah, atau hapus siswa satu per satu, atau impor sekaligus dari Excel. Perubahan langsung dipakai di pelaporan, kamera, dan form orang tua.</p>
+        <div class="meta" style="margin-top:10px"><span id="sTotal">0 siswa</span><span id="sKelasN">0 kelas</span><span id="sDemo" hidden></span></div>
+      </div>
+      <div class="grid3">
+        <div class="panel">
+          <div class="panel-head">
+            <div><div class="eyebrow">Siswa</div><h2>Daftar siswa per kelas</h2></div>
+            <label class="kelassel">Kelas <select id="sKelas" aria-label="Pilih kelas"></select></label>
+          </div>
+          <input type="search" id="sCari" placeholder="Cari nama atau NIS di kelas ini" aria-label="Cari siswa">
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>NIS</th><th>Nama</th><th>No. WA ortu</th><th>Wajah</th><th></th></tr></thead>
+              <tbody id="sbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <form class="panel" id="siswaForm" novalidate>
+          <div><div class="eyebrow" id="sfEyebrow">Siswa baru</div><h2 id="sfTitle">Tambah siswa</h2></div>
+          <div class="field"><label for="sfNis">NIS</label><input type="text" id="sfNis" maxlength="20" inputmode="numeric" autocomplete="off" placeholder="Contoh: 2301101"></div>
+          <div class="field"><label for="sfNama">Nama lengkap</label><input type="text" id="sfNama" maxlength="80" autocomplete="off" placeholder="Contoh: Bima Pratama"></div>
+          <div class="row2">
+            <div class="field"><label for="sfKelas">Kelas</label><select id="sfKelas"></select></div>
+            <div class="field"><label for="sfHp">No. WA orang tua <span class="sub">(opsional)</span></label><input type="tel" id="sfHp" maxlength="20" inputmode="tel" autocomplete="off" placeholder="0812 3456 7890"></div>
+          </div>
+          <p class="err" id="sfErr" hidden role="alert"></p>
+          <div class="actions"><button class="btn" type="button" id="sfBatal" hidden>Batal ubah</button><button class="btn primary" type="submit" id="sfSimpan">Simpan siswa</button></div>
+        </form>
+      </div>
+
+      <div class="grid3">
+        <div class="panel">
+          <div><div class="eyebrow">Impor</div><h2>Impor banyak siswa dari Excel</h2></div>
+          <ol class="hint steps-sm">
+            <li>Unduh template, lalu isi di Excel: kolom <b>NIS</b>, <b>Nama</b>, <b>Kelas</b>, dan <b>No WA Ortu</b> (boleh kosong).</li>
+            <li>Simpan sebagai <b>CSV</b> (File → Save As → CSV).</li>
+            <li>Pilih file di bawah. NIS yang sudah ada akan diperbarui, bukan dobel.</li>
+          </ol>
+          <div class="actions" style="justify-content:flex-start"><button class="btn small" type="button" id="impTemplate">⬇ Unduh template</button></div>
+          <div class="field"><label for="impFile">File CSV</label><input type="file" id="impFile" accept=".csv,text/csv"></div>
+          <label class="toggle"><input type="checkbox" id="impBuatKelas"> Buat otomatis kelas yang belum ada</label>
+          <p class="hint" id="impInfo" hidden></p>
+          <p class="err" id="impErr" hidden role="alert"></p>
+          <div class="newpw" id="impHasil" hidden></div>
+          <div class="actions"><button class="btn primary" type="button" id="impKirim" disabled>Impor</button></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div><div class="eyebrow">Kelas</div><h2>Daftar kelas</h2></div></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Kelas</th><th>Wali kelas</th><th class="num">Siswa</th><th></th></tr></thead>
+              <tbody id="kbody"></tbody>
+            </table>
+          </div>
+          <form class="row2" id="kelasForm" novalidate style="align-items:end">
+            <div class="field"><label for="kfNama">Kelas baru</label><input type="text" id="kfNama" maxlength="20" placeholder="Contoh: X-2"></div>
+            <div class="field"><label for="kfWali">Nama wali kelas</label><input type="text" id="kfWali" maxlength="80" placeholder="Contoh: Rina Kartika, S.Pd."></div>
+            <p class="err" id="kfErr" hidden role="alert" style="grid-column:1/-1"></p>
+            <div class="actions" style="grid-column:1/-1"><button class="btn" type="submit">＋ Tambah kelas</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel danger-zone" id="demoPanel" hidden>
+        <div><div class="eyebrow">Data contoh</div><h2>Data contoh harian</h2></div>
+        <p class="hint" style="margin:0" id="demoText"></p>
+        <div class="actions" style="justify-content:flex-start"><button class="btn" type="button" id="demoToggle"></button></div>
+      </div>
+    </section>
+
+    <!-- ===== Pengguna (Admin) ===== -->
+    <section class="view" id="v-users" hidden>
+      <div>
+        <div class="eyebrow">Administrator</div>
+        <h1>Kelola pengguna dan hak akses</h1>
+        <p class="lead">Tambah akun guru dan TU, atur peran, reset kata sandi, dan nonaktifkan akun yang tidak dipakai lagi.</p>
+      </div>
+      <div class="grid3">
+        <div class="panel">
+          <div><div class="eyebrow">Akun</div><h2>Daftar pengguna</h2></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Nama</th><th>Peran</th><th>Kelas</th><th>Status</th><th>Login terakhir</th><th></th></tr></thead>
+              <tbody id="ubody"></tbody>
+            </table>
+          </div>
+        </div>
+        <form class="panel" id="userForm" novalidate>
+          <div><div class="eyebrow">Akun baru</div><h2>Tambah pengguna</h2></div>
+          <div class="field"><label for="nName">Nama lengkap</label><input type="text" id="nName" maxlength="80" placeholder="Contoh: Rina Kartika, S.Pd."></div>
+          <div class="field"><label for="nUser">ID pengguna</label><input type="text" id="nUser" maxlength="30" autocapitalize="none" spellcheck="false" placeholder="Contoh: guru.rina"></div>
+          <div class="row2">
+            <div class="field"><label for="nRole">Peran</label>
+              <select id="nRole"><option value="guru">Guru</option><option value="tu">TU</option><option value="admin">Admin</option></select></div>
+            <div class="field"><label for="nKelas">Wali kelas</label>
+              <select id="nKelas"><option value="">Bukan wali kelas</option></select></div>
+          </div>
+          <p class="err" id="uErr" hidden role="alert"></p>
+          <div class="newpw" id="newPw" hidden></div>
+          <div class="actions"><button class="btn primary" type="submit">Buat akun</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div><div class="eyebrow">Hak akses</div><h2>Apa yang bisa dilakukan tiap peran</h2></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Fitur</th><th>Admin</th><th>TU</th><th>Guru</th></tr></thead>
+            <tbody id="pbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel danger-zone">
+        <div><div class="eyebrow">Data demo</div><h2>Kembalikan ke kondisi awal</h2></div>
+        <p class="hint" style="margin:0">Menghapus akun, laporan, lampiran, dan log yang dibuat selama mencoba demo. Berlaku untuk semua pengguna karena data tersimpan di server.</p>
+        <div class="actions" style="justify-content:flex-start"><button class="btn danger" type="button" id="resetDemo">Reset data demo</button></div>
+      </div>
+    </section>
+
+    <!-- Log, tampil di semua peran -->
+    <section class="panel" style="margin-top:22px">
+      <div class="panel-head">
+        <div><div class="eyebrow">Log audit</div><h2>Aktivitas terbaru</h2></div>
+        <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" id="logScope"></span><button class="btn small" type="button" id="exportLog" hidden>⬇ Ekspor log</button></span>
+      </div>
+      <ul class="log" id="log"></ul>
+    </section>
+  </main>
+  <footer class="foot"><div class="wrap">Hadirin v0.11 · Scan wajah CNN · Data tersimpan di server (Supabase) · Sesi otomatis berakhir setelah 15 menit tanpa aktivitas.</div></footer>
+</div>
+
+<!-- ================= DIALOG GANTI SANDI ================= -->
+<dialog id="pwDialog" aria-labelledby="pwTitle">
+  <form id="pwForm" class="dform" novalidate>
+    <div><div class="eyebrow">Keamanan akun</div><h2 id="pwTitle">Ganti kata sandi</h2></div>
+    <p class="hint" id="pwLead" style="margin:0"></p>
+    <div class="field"><label for="pwOld">Kata sandi saat ini</label><input type="password" id="pwOld" autocomplete="current-password" maxlength="128"></div>
+    <div class="field"><label for="pwNew">Kata sandi baru</label><input type="password" id="pwNew" autocomplete="new-password" maxlength="128">
+      <div class="meter" id="pwMeter"><i></i><i></i><i></i><i></i></div><span class="hint" id="pwMeterTxt"></span>
+      <span class="hint">Minimal 8 karakter, berisi huruf dan angka.</span></div>
+    <div class="field"><label for="pwNew2">Ulangi kata sandi baru</label><input type="password" id="pwNew2" autocomplete="new-password" maxlength="128"></div>
+    <p class="err" id="pwErr" hidden role="alert"></p>
+    <div class="actions"><button class="btn" type="button" id="pwCancel">Batal</button><button class="btn primary" type="submit">Simpan</button></div>
+  </form>
+</dialog>
+
+<!-- ================= DIALOG NOMOR WA ORANG TUA ================= -->
+<dialog id="hpDialog" aria-labelledby="hpTitle">
+  <form id="hpForm" class="dform" novalidate>
+    <div><div class="eyebrow">Kontak orang tua</div><h2 id="hpTitle">Nomor WhatsApp orang tua</h2></div>
+    <p class="hint" id="hpLead" style="margin:0"></p>
+    <div class="field"><label for="hpInput">Nomor WhatsApp</label>
+      <input type="tel" id="hpInput" inputmode="tel" autocomplete="off" maxlength="20" placeholder="Contoh: 0812 3456 7890">
+      <span class="hint">Hanya terlihat oleh wali kelas, TU, dan Admin.</span></div>
+    <p class="err" id="hpErr" hidden role="alert"></p>
+    <div class="actions"><button class="btn" type="button" id="hpCancel">Batal</button><button class="btn" type="button" id="hpClear">Hapus nomor</button><button class="btn primary" type="submit" id="hpSave">Simpan</button></div>
+  </form>
+</dialog>
+
+<dialog id="detDialog" class="wide" aria-labelledby="detTitle">
+  <div class="dform">
+    <div class="panel-head"><div><div class="eyebrow">Data siswa</div><h2 id="detTitle">Cari siswa</h2></div>
+      <span style="display:flex;gap:6px"><button class="btn small" type="button" id="detBack" hidden>← Cari lagi</button><button class="btn small" type="button" id="detClose">Tutup</button></span></div>
+    <div id="detSearch">
+      <input type="search" id="detQ" placeholder="Ketik NIS atau nama siswa (minimal 2 huruf)" aria-label="Cari NIS atau nama siswa" autocomplete="off">
+      <p class="hint" id="detHint" style="margin:8px 0 0">Contoh: 2301102 atau Bima.</p>
+      <ul class="detres" id="detRes"></ul>
+    </div>
+    <div id="detBody" hidden></div>
+  </div>
+</dialog>
+
+<dialog id="lampDialog" class="wide" aria-labelledby="lampTitle">
+  <div class="dform">
+    <div class="panel-head"><div><div class="eyebrow">Lampiran surat</div><h2 id="lampTitle">Lampiran</h2></div>
+      <button class="btn small" type="button" id="lampClose">Tutup</button></div>
+    <div class="lampview" id="lampView"><p class="hint">Memuat lampiran…</p></div>
+    <div class="actions"><button class="btn" type="button" id="lampOpen">↗ Buka di tab baru</button><button class="btn" type="button" id="lampSave">⬇ Unduh</button></div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+</body>
+</html>

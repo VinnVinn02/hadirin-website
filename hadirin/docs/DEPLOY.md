@@ -103,8 +103,11 @@ Skrip ini melakukan:
 6. Menguji perpanjangan otomatis sertifikat
 
 Setelah selesai, buka:
-- `https://domainanda.com` untuk login Admin/TU/Guru
-- `https://domainanda.com/#lapor` untuk form orang tua (link ini yang dibagikan ke grup WA)
+- `https://domainanda.com` halaman depan publik (profil produk, boleh diindeks mesin pencari)
+- `https://domainanda.com/app` untuk login Admin/TU/Guru (tidak diindeks)
+- `https://domainanda.com/app#lapor` untuk form orang tua (link ini yang dibagikan ke grup WA; link lama `/#lapor` tetap diteruskan)
+
+> Halaman depan (`public/index.html`, `robots.txt`, `sitemap.xml`) memuat alamat `https://hadirin-three.vercel.app`. Kalau memakai domain sendiri, ganti alamat itu di ketiga file tersebut.
 
 ---
 

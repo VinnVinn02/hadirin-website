@@ -45,7 +45,8 @@
     }catch(_){setSync(false);throw new Error('Tidak bisa terhubung ke server. Periksa koneksi internet.');}
     const txt=await r.text();let data=null;try{data=txt?JSON.parse(txt):null;}catch(_){}
     if(!r.ok){
-      const m=(data&&data.message)||('Server sedang bermasalah ('+r.status+'). Coba lagi.');
+      let m=(data&&data.message)||('Server sedang bermasalah ('+r.status+'). Coba lagi.');
+      if(/Could not find the function|PGRST202/i.test(m)||(data&&data.code==='PGRST202'))m='Fitur ini butuh pembaruan database. Admin: jalankan file migrasi terbaru di Supabase → SQL Editor.';
       if(m==='SESI_HABIS'){sessionGone();throw new Error('Sesi berakhir. Silakan masuk lagi.');}
       setSync(true);throw new Error(m);
     }
@@ -102,20 +103,34 @@
       return {name:safeName(f.name.replace(/\.\w+$/,'')+'.jpg'),mime:'image/jpeg',data:b64(await blob.arrayBuffer())};
     }catch(_){throw new Error('Foto tidak bisa dibaca. Coba foto ulang atau pakai format JPG.');}
   }
+  // Pratinjau lampiran di dalam halaman: foto langsung tampil, PDF lewat tombol buka/unduh.
+  // (Membuka tab baru setelah menunggu server sering diblokir browser sebagai pop-up.)
+  let lampBlob=null, lampUrl='', lampName='';
   async function openLampiran(id){
+    const dlg=$('lampDialog'), view=$('lampView');
+    if(lampUrl){URL.revokeObjectURL(lampUrl);lampUrl='';}
+    lampBlob=null;$('lampTitle').textContent='Lampiran';view.innerHTML='<p class="hint">Memuat lampiran…</p>';
+    $('lampOpen').disabled=$('lampSave').disabled=true;
+    if(!dlg.open)dlg.showModal();
     try{
-      toast('Membuka lampiran…');
       const a=await authed('lampiran_get',{p_id:id});
       const bin=atob(a.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
-      saveBlob(new Blob([u],{type:a.mime}),a.name,true);
-    }catch(e){toast(e.message,'warn');}
+      lampBlob=new Blob([u],{type:a.mime});lampUrl=URL.createObjectURL(lampBlob);lampName=a.name;
+      $('lampTitle').textContent=a.name;
+      if(/^image\//.test(a.mime)){const img=new Image();img.src=lampUrl;img.alt='Lampiran '+a.name;view.replaceChildren(img);}
+      else view.innerHTML=`<div class="empty"><span class="big">📄</span>File PDF. Tekan <b>Buka di tab baru</b> untuk membaca, atau <b>Unduh</b>.</div>`;
+      $('lampOpen').disabled=$('lampSave').disabled=false;
+    }catch(e){view.innerHTML=`<p class="err">${esc(e.message)}</p>`;}
   }
+  $('lampClose').addEventListener('click',()=>$('lampDialog').close());
+  $('lampOpen').addEventListener('click',()=>{if(lampBlob)saveBlob(lampBlob,lampName,true);});
+  $('lampSave').addEventListener('click',()=>{if(lampBlob)saveBlob(lampBlob,lampName,false);});
 
   /* ---------- Akun & peran ---------- */
   const ROLE={admin:'Admin',tu:'TU',guru:'Guru'};
   const demo=[['admin','admin123','admin'],['tu.sari','tu123','tu'],['guru.firman','guru123','guru']];
-  const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],users:['admin']};
-  const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['users','Pengguna']];
+  const PERMS={lapor:['admin','tu','guru'],kamera:['admin','tu','guru'],verif:['admin','tu'],rekap:['admin','tu'],siswa:['admin','tu'],users:['admin']};
+  const TABS=[['lapor','Pelaporan'],['kamera','Kamera kelas'],['verif','Verifikasi surat'],['rekap','Rekap sekolah'],['siswa','Data siswa'],['users','Pengguna']];
   let session=null, token=null, view='lapor';
 
   function pwProblem(pw,uid){
@@ -259,7 +274,7 @@
 
   /* ---------- Data dari server ---------- */
   let students=[], hadir=new Set(), reports=[], incoming=[], kelas='', kelasList=[], chart=[], watch=[], log=[];
-  let users=[], vitems=[], rrows=[], poller=null, busyRefresh=false, loadedOnce={};
+  let users=[], vitems=[], rrows=[], poller=null, busyRefresh=false, loadedOnce={}, kontak=new Map();
   const byId=id=>students.find(s=>s.id===id)||{id,name:'(siswa)',nis:'-'};
   const LBL={sakit:'Sakit',izin:'Izin',alpa:'Alpa'};
 
@@ -270,13 +285,15 @@
       const jobs=[authed('log_list').then(r=>{log=r||[];})];
       if(view==='lapor')jobs.push(authed('data_harian',{p_kelas:kelas||null}).then(d=>{
         todayISO=d.hari||todayISO;kelas=d.kelas;kelasList=d.kelasList||[];students=d.siswa||[];hadir=new Set(d.hadir||[]);
-        reports=d.reports||[];incoming=d.incoming||[];chart=d.chart||[];watch=d.watch||[];wali=d.wali||'';}));
+        reports=d.reports||[];incoming=d.incoming||[];chart=d.chart||[];watch=d.watch||[];wali=d.wali||'';})
+        .then(()=>authed('kontak_ortu',{p_kelas:kelas}).then(r=>{kontak=new Map((r||[]).map(c=>[c.sid,c]));},()=>{kontak=new Map();})));
       if(view==='kamera')jobs.push(authed('data_harian',{p_kelas:kelas||null}).then(d=>{
         todayISO=d.hari||todayISO;kelas=d.kelas;kelasList=d.kelasList||[];students=d.siswa||[];hadir=new Set(d.hadir||[]);
         reports=d.reports||[];incoming=d.incoming||[];}).then(()=>authed('wajah_list',{p_kelas:kelas})).then(r=>{setFaces(r||[]);}));
       if(view==='verif')jobs.push(authed('verif_list').then(r=>{vitems=r||[];}));
       if(view==='rekap')jobs.push(authed('rekap').then(r=>{rrows=(r||[]).sort((a,b)=>a[0].localeCompare(b[0],'id',{numeric:true}));}));
-      if(view==='users')jobs.push(authed('users_list').then(r=>{users=r||[];}));
+      if(view==='users')jobs.push(authed('users_list').then(r=>{users=r||[];}),rpc('ortu_kelas').then(r=>{kelasAll=r||[];}));
+      if(view==='siswa')jobs.push(authed('siswa_list',{p_kelas:sKelas||null}).then(r=>{sdata=r;sKelas=r.kelas;}));
       if(!loadedOnce[view]&&!quiet)showLoading();
       await Promise.all(jobs);
       loadedOnce[view]=true;
@@ -291,6 +308,7 @@
     if(view==='verif')$('vbody').innerHTML='<tr><td colspan="6"><div class="empty">Memuat…</div></td></tr>';
     if(view==='rekap')$('rbody').innerHTML='<tr><td colspan="9"><div class="empty">Memuat…</div></td></tr>';
     if(view==='users')$('ubody').innerHTML='<tr><td colspan="6"><div class="empty">Memuat…</div></td></tr>';
+    if(view==='siswa')$('sbody').innerHTML='<tr><td colspan="5"><div class="empty">Memuat…</div></td></tr>';
   }
   // Jalankan aksi ke server dengan tombol dinonaktifkan sementara
   async function act(btn,fn){
@@ -330,7 +348,7 @@
     $('tiles').innerHTML=tiles.map(([l,col,n,note])=>`<div class="tile" style="--accent:${col}"><span class="lbl"><i class="dot" style="background:${col}"></i>${l}</span><span class="num">${n}</span><span class="note">${note}</span></div>`).join('');
   }
   const matchQ=(s,q)=>!q||s.name.toLowerCase().includes(q)||String(s.nis).endsWith(q);
-  const fileBtn=r=>r.file?(r.lampiran?`<button class="linkbtn" type="button" data-lamp="${esc(r.id)}">📎 ${esc(r.file)}</button>`:`📎 ${esc(r.file)}`):'';
+  const fileBtn=r=>r.file?(r.lampiran?`<button class="linkbtn" type="button" data-lamp="${esc(r.id)}">📎 ${esc(r.file)}</button>`:`<span class="sub" title="Data contoh: hanya nama file, tidak ada file yang tersimpan">📎 ${esc(r.file)} · contoh, tanpa file</span>`):'';
   function renderQueue(){
     const all=pending(), q=$('qSearch').value.trim().toLowerCase();
     const list=all.filter(s=>matchQ(s,q)), incs=incoming.filter(r=>matchQ(byId(r.sid),q));
@@ -364,7 +382,7 @@
       <td><div class="ket">${esc(r.ket)||'<span class="sub">Tidak ada kabar sampai batas jam lapor</span>'}</div>${r.file?`<div class="sub">Lampiran: ${fileBtn(r)} · ${verifPill(r.verif)}</div>`:''}${r.verif==='ditolak'&&r.alasan?`<div class="sub">Alasan TU: ${esc(r.alasan)}</div>`:''}</td>
       <td class="mono">${per}</td>
       <td><div>${esc(r.pelapor)}</div><div class="sub mono">${esc(r.jam)}${r.oleh?' · '+esc(r.oleh):''}</div></td>
-      <td style="white-space:nowrap">${r.jenis==='alpa'&&false?'':`<button class="btn small" type="button" data-edit="${esc(r.id)}">Ubah</button>`}</td></tr>`;}).join('');
+      <td style="white-space:nowrap">${waBtn(r.sid,r.jenis,r.id)} <button class="btn small" type="button" data-edit="${esc(r.id)}">Ubah</button></td></tr>`;}).join('');
   }
   function renderChart(){
     const days=['Sen','Sel','Rab','Kam','Jum'];
@@ -385,7 +403,8 @@
   function renderWatch(){
     if(!watch.length){$('watch').innerHTML='<li class="empty">Belum ada siswa dengan 2 kali atau lebih tidak hadir dalam 30 hari terakhir.</li>';return;}
     $('watch').innerHTML=watch.map(w=>{const parts=[['sakit','Sakit'],['izin','Izin'],['alpa','Alpa']].filter(([k])=>+w[k]>0).map(([k,l])=>`${w[k]}× ${l}`);
-      return `<li><b>${esc(w.name)}</b><span class="pill ${esc(w.jenis)}">${w.n}× tidak hadir</span><span class="why">${parts.join(', ')} dalam 30 hari terakhir.${+w.alpa>=2?' Pertimbangkan panggilan orang tua.':''}</span></li>`;}).join('');
+      const s=students.find(x=>x.name===w.name);
+      return `<li><b>${esc(w.name)}</b><span class="pill ${esc(w.jenis)}">${w.n}× tidak hadir</span><span class="why">${parts.join(', ')} dalam 30 hari terakhir.${+w.alpa>=2?' Pertimbangkan panggilan orang tua.':''}</span>${s?`<span class="why">${waBtn(s.id,'rekap')}</span>`:''}</li>`;}).join('');
   }
   function renderChips(){
     const j=document.querySelector('input[name=jenis]:checked');
@@ -404,7 +423,8 @@
     selected=sid;editing=rec||null;const s=byId(sid);
     $('formTitle').textContent=mode==='periksa'?'Periksa laporan dari orang tua':mode==='ubah'?'Ubah laporan':'Laporkan ketidakhadiran';
     $('who').hidden=false;
-    $('who').innerHTML=`<span class="av">${initials(s.name)}</span><span><b>${esc(s.name)}</b><span class="hint">NIS ${esc(s.nis)} · ${esc(kelas)}</span></span>`;
+    $('who').innerHTML=`<span class="av">${initials(s.name)}</span><span style="min-width:0;flex:1"><b>${esc(s.name)}</b><span class="hint">NIS ${esc(s.nis)} · ${esc(kelas)}</span></span>
+      <span class="waact" data-k="${rec?esc(rec.jenis):'belum'}" data-r="${rec?esc(rec.id):''}">${waBtn(sid,rec?rec.jenis:'belum',rec&&rec.id)}</span>`;
     resetForm();
     if(rec){
       if(rec.jenis!=='alpa')document.querySelector(`input[name=jenis][value=${rec.jenis}]`).checked=true;
@@ -421,6 +441,79 @@
     if(ids.includes(editing&&editing.id))clearSelection();
     toast(n===1?'Laporan orang tua diterima.':`${n} laporan orang tua diterima.`,'ok');refresh(true);
   }
+  /* ---------- WhatsApp ke orang tua (wa.me, dikirim manual oleh guru) ---------- */
+  const SEKOLAH='SMA Harapan Bangsa';
+  // Tombol: jika nomor sudah ada -> "WA ortu"; jika belum -> "Isi no. WA"
+  function waBtn(sid,kind,rid){
+    const c=kontak.get(sid), has=!!(c&&c.hp);
+    return `<button class="btn small${has?' wa':''}" type="button" data-wa="${sid}" data-wak="${esc(kind||'belum')}"${rid?` data-war="${esc(rid)}"`:''}
+      title="${has?'Buka WhatsApp dengan pesan yang sudah terisi':'Nomor WA orang tua belum ada'}">${has?'💬 WA ortu':'＋ No. WA'}</button>`
+      +(has?` <button class="linkbtn small" type="button" data-hp="${sid}" title="Ubah nomor WA orang tua">ubah no.</button>`:'');
+  }
+  const salam=()=>{const h=new Date().getHours();return h<11?'Selamat pagi':h<15?'Selamat siang':h<18?'Selamat sore':'Selamat malam';};
+  // Jumlah HARI tidak hadir 30 hari terakhir (lebih efektif daripada hanya "hari ini tidak masuk")
+  function akumulasi(sid,nama){
+    const c=kontak.get(sid)||{}, sk=+c.sakit||0, iz=+c.izin||0, al=+c.alpa||0, n=sk+iz+al;
+    if(n<2)return '';
+    const parts=[[sk,'sakit'],[iz,'izin'],[al,'tanpa keterangan']].filter(([v])=>v>0).map(([v,l])=>`${v} hari ${l}`);
+    return `\n\nSebagai informasi, dalam 30 hari terakhir ${nama} sudah tidak masuk sekolah *${n} hari* (${parts.join(', ')}).`;
+  }
+  function waPesan(sid,kind,rec){
+    const s=byId(sid), nama=s.name, tgl=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const dari=session&&session.name?session.name:'Wali kelas';
+    const link=/^https?:$/.test(location.protocol)?location.origin+location.pathname+'#lapor?k='+encodeURIComponent(kelas):'';
+    const buka=`${salam()} Bapak/Ibu orang tua/wali dari *${nama}* (kelas ${kelas}).`;
+    const tutup=`\n\nTerima kasih.\n${dari}\n${SEKOLAH}`;
+    const per=rec?(rec.dari===rec.sampai?fmtDate(rec.dari):fmtDate(rec.dari)+' – '+fmtDate(rec.sampai)):'';
+    if(kind==='belum')return `${buka}\n\nHingga pukul ${clock()} hari ini (${tgl}), ${nama} belum hadir di sekolah dan kami belum menerima kabar.\n\nJika ${nama} sakit atau izin, mohon kabari kami lewat pesan ini${link?` atau isi formulir berikut:\n${link}`:'.'}`+akumulasi(sid,nama)+tutup;
+    if(kind==='alpa')return `${buka}\n\nKami informasikan bahwa ${nama} tercatat *tidak hadir tanpa keterangan (Alpa)* pada ${tgl}.\n\nJika ada alasan yang belum kami terima, mohon kabari kami lewat pesan ini${link?` atau isi formulir:\n${link}`:'.'}`+akumulasi(sid,nama)+tutup;
+    if(kind==='sakit'||kind==='izin')return `${buka}\n\nLaporan *${LBL[kind]}* untuk ${nama}${per?` (${per})`:''} sudah kami terima dan dicatat${rec&&rec.no?` dengan nomor ${rec.no}`:''}.${kind==='sakit'?` Semoga ${nama} lekas sembuh.`:''}`+akumulasi(sid,nama)+tutup;
+    // 'rekap': ringkasan kehadiran
+    const ak=akumulasi(sid,nama);
+    return `${buka}\n\nKami ingin berbagi catatan kehadiran ${nama}.`+(ak?ak.replace(/^\n\nSebagai informasi, dalam/,' Dalam'):` Dalam 30 hari terakhir ${nama} jarang tidak masuk.`)
+      +`\n\nKehadiran rutin sangat membantu ${nama} mengikuti pelajaran. Jika ada kendala, kami terbuka untuk berdiskusi.`+tutup;
+  }
+  function waBuka(sid,kind,rid){
+    const c=kontak.get(sid);if(!c||!c.hp)return hpEdit(sid,{kind,rid});
+    const rec=rid?reports.find(r=>r.id===rid)||incoming.find(r=>r.id===rid):null;
+    const url='https://wa.me/'+c.hp+'?text='+encodeURIComponent(waPesan(sid,kind,rec));
+    const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+    document.body.appendChild(a);a.click();a.remove();
+    authed('wa_catat',{p_sid:sid,p_jenis:kind}).catch(()=>{});
+  }
+  // Dialog nomor WA
+  let hpSid=null, hpNext=null;
+  function hpEdit(sid,next){
+    hpSid=sid;hpNext=next||null;const s=byId(sid), c=kontak.get(sid);
+    $('hpLead').textContent=`Orang tua/wali dari ${s.name} (NIS ${s.nis}).`;
+    $('hpInput').value=c&&c.hp?'0'+c.hp.slice(2):'';$('hpClear').hidden=!(c&&c.hp);
+    $('hpErr').hidden=true;$('hpSave').textContent=hpNext?'Simpan & buka WA':'Simpan';
+    $('hpDialog').showModal();$('hpInput').focus();
+  }
+  async function hpSave(val,btn){
+    const sid=hpSid, next=hpNext;
+    try{
+      if(btn)btn.disabled=true;
+      const hp=await authed('hp_ortu_set',{p_sid:sid,p_hp:val});
+      const c=kontak.get(sid)||{sid,sakit:0,izin:0,alpa:0};kontak.set(sid,Object.assign({},c,{hp}));
+      $('hpDialog').close();toast(hp?'Nomor WA orang tua disimpan.':'Nomor WA orang tua dihapus.','ok');
+      renderAll();
+      const wa=$('who').querySelector('.waact');if(wa&&selected===sid)wa.innerHTML=waBtn(sid,wa.dataset.k,wa.dataset.r||null);
+      if(hp&&next)waBuka(sid,next.kind,next.rid);
+    }catch(e){$('hpErr').textContent=e.message;$('hpErr').hidden=false;}
+    finally{if(btn)btn.disabled=false;}
+  }
+  $('hpForm').addEventListener('submit',e=>{e.preventDefault();const v=$('hpInput').value.trim();
+    if(!v){$('hpErr').textContent='Isi nomor WhatsApp dulu.';$('hpErr').hidden=false;return;}
+    hpSave(v,$('hpSave'));});
+  $('hpClear').addEventListener('click',e=>hpSave('',e.currentTarget));
+  $('hpCancel').addEventListener('click',()=>$('hpDialog').close());
+  // Satu penangan klik untuk semua tombol WA (antrean, tabel, form, daftar perhatian)
+  document.addEventListener('click',e=>{
+    const w=e.target.closest('button[data-wa]');if(w){e.preventDefault();return waBuka(+w.dataset.wa,w.dataset.wak,w.dataset.war||null);}
+    const h=e.target.closest('button[data-hp]');if(h){e.preventDefault();return hpEdit(+h.dataset.hp);}
+  });
+
   $('queue').addEventListener('click',e=>{
     const l=e.target.closest('button[data-lamp]');if(l)return openLampiran(l.dataset.lamp);
     const a=e.target.closest('button[data-acc]');if(a)return accept([a.dataset.acc],a);
@@ -539,14 +632,16 @@
     toast(n?`Pengingat dicatat untuk ${n} wali kelas.`:'Semua kelas sudah lengkap.');refresh(true);});
 
   /* ---------- Pengguna (Admin) ---------- */
-  const classList=['X-1','X-3','XI IPA 1','XI IPA 2','XI IPS 1','XII IPA 1','XII IPS 2'];
-  $('nKelas').innerHTML+=classList.map(k=>`<option>${k}</option>`).join('');
+  let kelasAll=[];
   $('nRole').addEventListener('change',e=>{$('nKelas').disabled=e.target.value!=='guru';if(e.target.value!=='guru')$('nKelas').value='';});
   function renderUsers(){
+    const nk=$('nKelas'), cur=nk.value;
+    nk.innerHTML='<option value="">Bukan wali kelas</option>'+kelasAll.map(k=>`<option>${esc(k)}</option>`).join('');
+    if(kelasAll.includes(cur))nk.value=cur;
     $('ubody').innerHTML=users.map(u=>`<tr>
       <td><b>${esc(u.name)}</b><div class="sub mono">${esc(u.u)}</div></td>
       <td><span class="pill ${esc(u.role)}">${ROLE[u.role]}</span></td>
-      <td>${u.kelas?esc(u.kelas):'<span class="sub">–</span>'}</td>
+      <td>${u.role==='guru'?`<select class="ukelas" data-ukelas="${esc(u.u)}" aria-label="Kelas wali untuk ${esc(u.u)}"><option value="">– Tanpa kelas –</option>${kelasAll.map(k=>`<option${k===u.kelas?' selected':''}>${esc(k)}</option>`).join('')}</select>${u.kelas?'':'<div class="sub">Belum bisa memakai menu Pelaporan</div>'}`:(u.kelas?esc(u.kelas):'<span class="sub">–</span>')}</td>
       <td>${u.active?'<span class="pill hadir">Aktif</span>':'<span class="pill wait">Nonaktif</span>'}${u.temp?'<div class="sub">Wajib ganti sandi</div>':u.nopw?'<div class="sub">Belum punya sandi</div>':''}</td>
       <td class="mono">${esc(u.last)}</td>
       <td style="white-space:nowrap">${session&&u.u===session.u?'<span class="sub">Akun Anda</span>':`<span style="display:flex;gap:6px"><button class="btn small" type="button" data-tog="${esc(u.u)}">${u.active?'Nonaktifkan':'Aktifkan'}</button><button class="btn small" type="button" data-rpw="${esc(u.u)}">${u.nopw?'Buat sandi':'Reset sandi'}</button></span>`}</td></tr>`).join('');
@@ -563,6 +658,16 @@
     ];
     $('pbody').innerHTML=rowsP.map(([f,...a])=>`<tr><td>${f}</td>${a.map(v=>`<td>${v?'<span class="check">✓ Bisa</span>':'<span class="cross">–</span>'}</td>`).join('')}</tr>`).join('');
   }
+  $('ubody').addEventListener('change',async e=>{
+    const sel=e.target.closest('select[data-ukelas]');if(!sel)return;
+    const uid=sel.dataset.ukelas, u=users.find(x=>x.u===uid), k=sel.value;
+    const msg=k?`Jadikan ${uid} wali kelas ${k}?`:`Lepaskan ${uid} dari kelas ${u&&u.kelas||''}?`;
+    if(!confirm(msg+' Akun itu akan diminta login ulang.')){sel.value=u&&u.kelas||'';return;}
+    sel.disabled=true;
+    try{await authed('user_kelas_set',{p_uid:uid,p_kelas:k||null});toast(k?`${uid} sekarang wali kelas ${k}.`:`${uid} dilepas dari kelas.`,'ok');}
+    catch(ex){toast(ex.message,'warn');sel.value=u&&u.kelas||'';}
+    finally{sel.disabled=false;refresh(true);}
+  });
   $('ubody').addEventListener('click',async e=>{
     const r=e.target.closest('button[data-rpw]');
     if(r){const uid=r.dataset.rpw;if(!confirm(`Buat kata sandi sementara baru untuk ${uid}? Kata sandi lama langsung tidak berlaku dan sesi akun itu diputus.`))return;
@@ -585,12 +690,235 @@
     $('nName').value='';$('nUser').value='';refresh(true);
   });
 
+  /* ---------- Data siswa & kelas (Admin + TU) ---------- */
+  let sdata=null, sKelas='', sEdit=null, impRows=[], impHeader=0;
+  const hpTampil=h=>h?('0'+String(h).slice(2)).replace(/(\d{4})(\d{4})(\d+)/,'$1 $2 $3'):'';
+  function renderSiswa(){
+    if(!sdata)return;
+    const kl=sdata.kelasList||[], q=$('sCari').value.trim().toLowerCase();
+    $('sTotal').textContent=`${sdata.total} siswa`;$('sKelasN').textContent=`${kl.length} kelas`;
+    const opts=kl.map(k=>`<option value="${esc(k.id)}">${esc(k.id)} (${k.n})</option>`).join('');
+    $('sKelas').innerHTML=opts;$('sKelas').value=sKelas;
+    const fk=$('sfKelas').value;$('sfKelas').innerHTML=kl.map(k=>`<option value="${esc(k.id)}">${esc(k.id)}</option>`).join('');
+    $('sfKelas').value=sEdit?sEdit.kelas:(kl.some(k=>k.id===fk)?fk:sKelas);
+    const list=(sdata.siswa||[]).filter(s=>!q||s.name.toLowerCase().includes(q)||s.nis.toLowerCase().includes(q));
+    $('sbody').innerHTML=list.length?list.map(s=>`<tr>
+      <td class="mono">${esc(s.nis)}</td><td><button class="linkbtn" type="button" data-sdet="${s.id}"><b>${esc(s.name)}</b></button></td>
+      <td class="mono">${s.hp?esc(hpTampil(s.hp)):'<span class="sub">–</span>'}</td>
+      <td>${s.wajah?'<span class="pill hadir">Terdaftar</span>':'<span class="pill wait">Belum</span>'}</td>
+      <td style="white-space:nowrap"><span style="display:flex;gap:6px"><button class="btn small" type="button" data-sedit="${s.id}">Ubah</button><button class="btn small danger" type="button" data-sdel="${s.id}">Hapus</button></span></td></tr>`).join('')
+      :`<tr><td colspan="5"><div class="empty">${q?'Tidak ada siswa yang cocok.':'Belum ada siswa di kelas ini. Tambahkan lewat form atau impor dari Excel.'}</div></td></tr>`;
+    $('kbody').innerHTML=kl.map(k=>`<tr><td><b>${esc(k.id)}</b></td>
+      <td>${k.wali?esc(k.wali):'<span class="sub">–</span>'}${k.guru?`<div class="sub">Akun: ${esc(k.guru)}</div>`:''}</td>
+      <td class="num">${k.n}</td>
+      <td style="white-space:nowrap"><span style="display:flex;gap:6px;justify-content:flex-end"><button class="btn small" type="button" data-kwali="${esc(k.id)}">Ubah wali</button>${k.n||k.guru?'':`<button class="btn small danger" type="button" data-kdel="${esc(k.id)}">Hapus</button>`}</span></td></tr>`).join('');
+    const isAdmin=session&&session.role==='admin';
+    $('demoPanel').hidden=!isAdmin;$('sDemo').hidden=!sdata.demo;$('sDemo').textContent='Data contoh harian: aktif';
+    $('demoText').innerHTML=sdata.demo
+      ?'<b>Aktif.</b> Setiap hari server mengisi kehadiran dan laporan contoh secara otomatis, jadi sebagian besar siswa langsung tercatat hadir sebelum discan. Matikan saat sekolah mulai memakai Hadirin sungguhan.'
+      :'<b>Mati.</b> Kehadiran hanya tercatat dari scan wajah dan input guru. Laporan contoh tidak dibuat lagi.';
+    $('demoToggle').textContent=sdata.demo?'Matikan data contoh':'Nyalakan data contoh';
+    $('demoToggle').className='btn '+(sdata.demo?'danger':'');
+  }
+  function resetSiswaForm(){
+    sEdit=null;$('sfNis').value='';$('sfNama').value='';$('sfHp').value='';$('sfErr').hidden=true;
+    $('sfEyebrow').textContent='Siswa baru';$('sfTitle').textContent='Tambah siswa';$('sfBatal').hidden=true;$('sfSimpan').textContent='Simpan siswa';
+    $('sfKelas').value=sKelas;
+  }
+  $('sKelas').addEventListener('change',e=>{sKelas=e.target.value;$('sCari').value='';if(!sEdit)$('sfKelas').value=sKelas;refresh();});
+  $('sCari').addEventListener('input',renderSiswa);
+  $('sfBatal').addEventListener('click',resetSiswaForm);
+  $('sbody').addEventListener('click',async e=>{
+    const b=e.target.closest('button');if(!b||!sdata)return;
+    if(b.dataset.sdet)return openDetail(+b.dataset.sdet);
+    const s=(sdata.siswa||[]).find(x=>String(x.id)===(b.dataset.sedit||b.dataset.sdel));if(!s)return;
+    if(b.dataset.sedit){sEdit=s;$('sfNis').value=s.nis;$('sfNama').value=s.name;$('sfKelas').value=s.kelas;$('sfHp').value=hpTampil(s.hp);
+      $('sfEyebrow').textContent='Ubah data';$('sfTitle').textContent=s.name;$('sfBatal').hidden=false;$('sfSimpan').textContent='Simpan perubahan';$('sfErr').hidden=true;
+      $('siswaForm').scrollIntoView({behavior:'smooth',block:'center'});$('sfNama').focus({preventScroll:true});return;}
+    if(!confirm(`Hapus ${s.name} (NIS ${s.nis})?\n\nSemua laporan, lampiran, data wajah, dan riwayat kehadiran siswa ini ikut terhapus dan tidak bisa dikembalikan.`))return;
+    const ok=await act(b,()=>authed('siswa_hapus',{p_id:s.id}).then(()=>true));
+    if(ok){if(sEdit&&sEdit.id===s.id)resetSiswaForm();toast(`${s.name} dihapus.`);refresh(true);}
+  });
+  $('siswaForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const fail=m=>{$('sfErr').textContent=m;$('sfErr').hidden=false;};
+    const nis=$('sfNis').value.trim(), nama=$('sfNama').value.trim(), k=$('sfKelas').value, hp=$('sfHp').value.trim();
+    if(nis.length<3)return fail('Isi NIS (minimal 3 karakter).');
+    if(nama.length<2)return fail('Isi nama lengkap siswa.');
+    if(!k)return fail('Pilih kelas. Kalau belum ada, tambahkan kelasnya dulu di daftar kelas.');
+    $('sfErr').hidden=true;
+    const r=await act($('sfSimpan'),()=>authed('siswa_simpan',{p_id:sEdit?sEdit.id:null,p_nis:nis,p_nama:nama,p_kelas:k,p_hp:hp||null}).catch(ex=>{fail(ex.message);return null;}));
+    if(!r)return;
+    toast(sEdit?`Data ${r.name} disimpan.`:`${r.name} ditambahkan ke ${r.kelas}.`,'ok');
+    sKelas=r.kelas;resetSiswaForm();refresh(true);
+  });
+
+  // ---- Impor CSV (dari Excel). Pemisah ; atau , dideteksi otomatis.
+  function parseCSV(text){
+    text=text.replace(/^\uFEFF/,'');
+    const first=text.split(/\r?\n/)[0]||'';
+    const sep=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?';':(first.includes('\t')&&!first.includes(',')?'\t':',');
+    const rows=[];let row=[],f='',q=false;
+    for(let i=0;i<text.length;i++){const c=text[i];
+      if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+      else if(c==='"')q=true;
+      else if(c===sep){row.push(f);f='';}
+      else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f='';}
+      else f+=c;}
+    if(f!==''||row.length){row.push(f);rows.push(row);}
+    return rows.filter(r=>r.some(c=>c.trim()!==''));
+  }
+  function csvToSiswa(rows){
+    if(!rows.length)return [];
+    const h=rows[0].map(c=>c.trim().toLowerCase());
+    const find=re=>h.findIndex(c=>re.test(c));
+    let iN=find(/^nis\b|induk/), iNm=find(/^nama/), iK=find(/^kelas|rombel/), iH=find(/wa|hp|telep|telp|no\.? ?(ortu|orang)/);
+    let data=rows;
+    impHeader=0;
+    if(iN>=0&&iNm>=0&&iK>=0){data=rows.slice(1);impHeader=1;}else{iN=0;iNm=1;iK=2;iH=3;}
+    return data.map(r=>({nis:(r[iN]||'').trim(),nama:(r[iNm]||'').trim(),kelas:(r[iK]||'').trim(),hp:iH>=0?(r[iH]||'').trim():''}));
+  }
+  $('impTemplate').addEventListener('click',()=>{
+    const csv='\uFEFFNIS;Nama;Kelas;No WA Ortu\r\n2301101;Contoh Nama Siswa;XI IPA 1;081234567890\r\n';
+    saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),'template-data-siswa.csv',false);
+  });
+  $('impFile').addEventListener('change',async e=>{
+    const f=e.target.files[0];impRows=[];$('impErr').hidden=true;$('impHasil').hidden=true;$('impInfo').hidden=true;$('impKirim').disabled=true;
+    if(!f)return;
+    if(f.size>2e6){$('impErr').textContent='File terlalu besar (maks 2 MB).';$('impErr').hidden=false;return;}
+    if(/\.xlsx?$/i.test(f.name)){$('impErr').textContent='File Excel (.xlsx) belum bisa dibaca langsung. Di Excel pilih File → Save As → CSV, lalu pilih file CSV-nya.';$('impErr').hidden=false;return;}
+    try{impRows=csvToSiswa(parseCSV(await f.text()));}catch(_){impRows=[];}
+    if(!impRows.length){$('impErr').textContent='Tidak ada baris data yang terbaca. Pastikan kolomnya NIS, Nama, Kelas.';$('impErr').hidden=false;return;}
+    if(impRows.length>3000){$('impErr').textContent=`Ada ${impRows.length} baris. Maksimal 3000 sekali impor, pecah file menjadi beberapa bagian.`;$('impErr').hidden=false;impRows=[];return;}
+    const kls=new Set(impRows.map(r=>r.kelas.toLowerCase()).filter(Boolean));
+    $('impInfo').innerHTML=`Terbaca <b>${impRows.length}</b> siswa di <b>${kls.size}</b> kelas. Contoh baris pertama: <span class="mono">${esc(impRows[0].nis)} · ${esc(impRows[0].nama)} · ${esc(impRows[0].kelas)}</span>`;
+    $('impInfo').hidden=false;$('impKirim').disabled=false;
+  });
+  $('impKirim').addEventListener('click',async e=>{
+    if(!impRows.length)return;
+    const r=await act(e.currentTarget,()=>authed('siswa_impor',{p_rows:impRows,p_buat_kelas:$('impBuatKelas').checked}).catch(ex=>{$('impErr').textContent=ex.message;$('impErr').hidden=false;return null;}));
+    if(!r)return;
+    const skip=(r.dilewati||[]).map(x=>`<li>Baris ${x.baris+impHeader}${x.nis?' (NIS '+esc(x.nis)+')':''}: ${esc(x.alasan)}</li>`).join('');
+    $('impHasil').innerHTML=`Selesai: <b>${r.baru}</b> siswa baru, <b>${r.diubah}</b> diperbarui${r.kelasBaru?`, <b>${r.kelasBaru}</b> kelas baru`:''}.`
+      +(r.jumlahDilewati?`<br><b>${r.jumlahDilewati}</b> baris dilewati${r.jumlahDilewati>50?' (50 pertama ditampilkan)':''}:<ul class="imp-skip">${skip}</ul>`:'');
+    $('impHasil').hidden=false;$('impErr').hidden=true;$('impFile').value='';impRows=[];$('impKirim').disabled=true;$('impInfo').hidden=true;
+    toast('Impor data siswa selesai.','ok');refresh(true);
+  });
+
+  // ---- Kelas
+  $('kelasForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const nama=$('kfNama').value.trim(), wali=$('kfWali').value.trim();
+    const fail=m=>{$('kfErr').textContent=m;$('kfErr').hidden=false;};
+    if(!nama)return fail('Isi nama kelas, misalnya X-2 atau XI IPA 3.');
+    $('kfErr').hidden=true;
+    const ok=await act(e.submitter,()=>authed('kelas_simpan',{p_id:nama,p_wali:wali,p_baru:true}).then(()=>true).catch(ex=>{fail(ex.message);return false;}));
+    if(!ok)return;
+    toast(`Kelas ${nama} ditambahkan.`,'ok');$('kfNama').value='';$('kfWali').value='';sKelas=nama;refresh(true);
+  });
+  $('kbody').addEventListener('click',async e=>{
+    const b=e.target.closest('button');if(!b||!sdata)return;
+    if(b.dataset.kwali){const k=sdata.kelasList.find(x=>x.id===b.dataset.kwali);
+      const w=prompt(`Nama wali kelas ${k.id}:`,k.wali||'');if(w===null)return;
+      const ok=await act(b,()=>authed('kelas_simpan',{p_id:k.id,p_wali:w,p_baru:false}).then(()=>true));
+      if(ok){toast(`Wali kelas ${k.id} disimpan.`,'ok');refresh(true);}return;}
+    if(b.dataset.kdel){const id=b.dataset.kdel;if(!confirm(`Hapus kelas ${id}? Kelas ini sudah kosong.`))return;
+      const ok=await act(b,()=>authed('kelas_hapus',{p_id:id}).then(()=>true));
+      if(ok){if(sKelas===id)sKelas='';toast(`Kelas ${id} dihapus.`);refresh(true);}}
+  });
+
+  // ---- Saklar data contoh (Admin)
+  $('demoToggle').addEventListener('click',async e=>{
+    if(!sdata)return;
+    const nyalakan=!sdata.demo;let kosong=false;
+    if(!nyalakan){
+      if(!confirm('Matikan data contoh harian?\n\nMulai sekarang kehadiran hanya tercatat dari scan wajah dan input guru.'))return;
+      kosong=confirm('Kosongkan juga kehadiran HARI INI?\n\nPilih OK supaya semua siswa mulai dari "belum hadir" dan scan wajah langsung mencatat. Kehadiran hasil scan hari ini juga ikut terhapus.');
+    }
+    const r=await act(e.currentTarget,()=>authed('data_contoh_set',{p_aktif:nyalakan,p_kosongkan:kosong}));
+    if(!r)return;
+    toast(nyalakan?'Data contoh harian dinyalakan.':`Data contoh dimatikan${r.dihapus?`, ${r.dihapus} kehadiran hari ini dikosongkan`:''}.`,'ok');refresh(true);
+  });
+
+  /* ---------- Cari siswa + detail (semua peran; guru hanya kelasnya) ----------
+     Hadirin tidak menyimpan foto wajah. "Foto" di sini = lampiran surat (dokter/izin). */
+  let detUrls=[], detTimer=null, detReq=0;
+  const tglID=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+  const fmtTgl=s=>tglID(s).toLocaleDateString('id-ID',{day:'numeric',month:'short'});
+  function detClear(){detUrls.forEach(u=>URL.revokeObjectURL(u));detUrls=[];}
+  function detShowSearch(){detClear();detReq++;$('detBody').hidden=true;$('detSearch').hidden=false;$('detBack').hidden=true;$('detTitle').textContent='Cari siswa';$('detQ').focus();}
+  $('cariBtn').addEventListener('click',()=>{$('detDialog').showModal();$('detQ').value='';$('detRes').innerHTML='';$('detHint').textContent='Contoh: 2301102 atau Bima.'+(session&&session.role==='guru'?' Hanya siswa kelas Anda.':'');detShowSearch();});
+  $('detClose').addEventListener('click',()=>$('detDialog').close());
+  $('detDialog').addEventListener('close',()=>{detClear();detReq++;});
+  $('detBack').addEventListener('click',detShowSearch);
+  $('detQ').addEventListener('input',()=>{clearTimeout(detTimer);detTimer=setTimeout(async()=>{
+    const q=$('detQ').value.trim();if(q.length<2){$('detRes').innerHTML='';return;}
+    try{const r=await authed('siswa_cari',{p_q:q});if($('detQ').value.trim()!==q)return;
+      $('detRes').innerHTML=r.length?r.map(s=>`<li><button type="button" data-sid="${s.id}"><span><b>${esc(s.name)}</b> <span class="sub">${esc(s.kelas)}</span></span><span class="mono">${esc(s.nis)}</span></button></li>`).join(''):'<li class="empty">Tidak ada siswa yang cocok.</li>';}
+    catch(e){$('detRes').innerHTML=`<li class="err">${esc(e.message)}</li>`;}},300);});
+  $('detRes').addEventListener('click',e=>{const b=e.target.closest('button[data-sid]');if(b)openDetail(+b.dataset.sid);});
+  $('detBody').addEventListener('click',e=>{const b=e.target.closest('button[data-lamp]');if(b)openLampiran(b.dataset.lamp);});
+
+  async function openDetail(sid){
+    const dlg=$('detDialog');if(!dlg.open)dlg.showModal();
+    detClear();const my=++detReq;
+    $('detSearch').hidden=true;$('detBody').hidden=false;$('detBack').hidden=false;$('detTitle').textContent='Memuat…';
+    $('detBody').innerHTML='<p class="hint">Memuat data siswa…</p>';
+    let x;try{x=await authed('siswa_detail',{p_sid:sid});}catch(e){$('detTitle').textContent='Data siswa';$('detBody').innerHTML=`<p class="err">${esc(e.message)}</p>`;return;}
+    if(my!==detReq)return;
+    $('detTitle').textContent=x.name;
+    const hadirSet=new Set(x.hadir||[]), lap=x.laporan||[];
+    const statusHari=dd=>{
+      if(hadirSet.has(dd))return 'hadir';
+      const l=lap.find(r=>r.status==='diterima'&&r.dari<=dd&&r.sampai>=dd);if(l)return l.jenis;
+      return '';};
+    // hari sekolah (Senin–Jumat) 30 hari terakhir
+    const days=[];for(let i=0;i<30;i++){const dd=addDays(x.hari,-i);const w=tglID(dd).getDay();if(w>0&&w<6)days.push(dd);}
+    const cnt={hadir:0,sakit:0,izin:0,alpa:0,kosong:0};days.forEach(dd=>{const st=statusHari(dd)||'kosong';cnt[st]++;});
+    const today=statusHari(x.hari);
+    const lampList=lap.filter(r=>r.lampiran);
+    const hpTxt=x.hp?('0'+String(x.hp).slice(2)).replace(/(\d{4})(\d{4})(\d+)/,'$1 $2 $3'):'–';
+    $('detBody').innerHTML=`<div class="det">
+      <div class="det-id">
+        <div><small>NIS</small><b class="mono">${esc(x.nis)}</b></div>
+        <div><small>Kelas</small><b>${esc(x.kelas)}</b></div>
+        <div><small>Wali kelas</small>${esc(x.wali||'–')}</div>
+        <div><small>No. WA orang tua</small><span class="mono">${esc(hpTxt)}</span></div>
+        <div><small>Hari ini</small>${today?`<span class="pill ${today}">${today==='hadir'?'Hadir':LBL[today]}</span>`:'<span class="pill wait">Belum ada kabar</span>'}</div>
+        <div><small>Data wajah</small>${x.wajah?`<span class="pill hadir">Terdaftar</span><div class="sub">${esc(x.wajah.at)} · persetujuan: ${esc(x.wajah.persetujuan)}</div>`:'<span class="pill wait">Belum didaftarkan</span>'}</div>
+      </div>
+      <p class="hint" style="margin:0">🔒 Hadirin tidak menyimpan foto wajah siswa, hanya 128 angka ciri wajah yang terenkripsi. Foto yang ada di bawah adalah lampiran surat.</p>
+      <div><h3>30 hari terakhir (hari sekolah)</h3>
+        <div class="tiles">${[['Hadir','hadir','var(--hadir)'],['Sakit','sakit','var(--sakit)'],['Izin','izin','var(--izin)'],['Alpa','alpa','var(--alpa)']].map(([l,k,c])=>`<div class="tile" style="--accent:${c}"><span class="lbl">${l}</span><span class="num">${cnt[k]}</span><span class="note">hari</span></div>`).join('')}</div>
+        <p class="hint" style="margin:6px 0 0">${cnt.kosong?`${cnt.kosong} hari tanpa catatan (tidak terscan dan tidak ada laporan).`:''}</p></div>
+      <div><h3>Kalender kehadiran</h3><div class="cal">${days.slice(0,20).map(dd=>{const st=statusHari(dd);
+        return `<span class="${st||'kosong'}" title="${esc(dd)}"><b>${esc(fmtTgl(dd))}</b>${st==='hadir'?'Hadir':st?LBL[st]:'–'}</span>`;}).join('')}</div></div>
+      <div><h3>Foto surat &amp; lampiran (${lampList.length})</h3>${lampList.length?`<div class="gal" id="detGal">${lampList.map(r=>`<button type="button" data-lamp="${esc(r.id)}" title="${esc(r.file)}"><span class="pdf" data-ph="${esc(r.id)}">${/\.pdf$/i.test(r.file)?'📄':'⏳'}</span><small>${esc(fmtTgl(r.dari))} · ${esc(r.file)}</small></button>`).join('')}</div>`:'<p class="hint" style="margin:0">Belum ada lampiran surat untuk siswa ini.</p>'}</div>
+      <div><h3>Riwayat laporan (${lap.length})</h3>${lap.length?`<div class="tablewrap"><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Keterangan</th><th>Status</th><th>Lampiran</th></tr></thead><tbody>${lap.map(r=>`<tr>
+        <td class="mono" style="white-space:nowrap">${esc(fmtTgl(r.dari))}${r.sampai!==r.dari?' – '+esc(fmtTgl(r.sampai)):''}</td>
+        <td><span class="pill ${esc(r.jenis)}">${LBL[r.jenis]}</span></td>
+        <td><div class="ket">${esc(r.ket)}</div><div class="sub">${esc(r.pelapor||'')}</div></td>
+        <td>${r.status==='masuk'?'<span class="pill wait">Menunggu wali kelas</span>':'<span class="pill hadir">Diterima</span>'}${r.verif?`<div class="sub">Surat: ${esc(r.verif)}${r.alasan?' · '+esc(r.alasan):''}</div>`:''}</td>
+        <td class="mono">${fileBtn(r)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="hint" style="margin:0">Belum ada laporan sakit/izin/alpa.</p>'}</div>
+    </div>`;
+    // muat pratinjau foto satu per satu (maks 12) supaya ringan
+    for(const r of lampList.slice(0,12)){
+      if(/\.pdf$/i.test(r.file))continue;
+      try{const a=await authed('lampiran_get',{p_id:r.id});if(my!==detReq)return;
+        if(!/^image\//.test(a.mime)){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='📄';continue;}
+        const bin=atob(a.data),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+        const url=URL.createObjectURL(new Blob([u],{type:a.mime}));detUrls.push(url);
+        const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph){const img=new Image();img.src=url;img.alt='Lampiran '+r.file;ph.replaceWith(img);}
+      }catch(_){const ph=document.querySelector(`[data-ph="${CSS.escape(r.id)}"]`);if(ph)ph.textContent='⚠️';}
+    }
+  }
+
   /* ---------- Kamera kelas: scan wajah (face-api.js / TensorFlow.js, model CNN) ----------
      Deteksi: TinyFaceDetector (CNN), 68 titik wajah, pengenal: ResNet-34 -> descriptor 128 angka.
      Cocok bila jarak Euclid < 0.5 di 3 frame berturut-turut + terdeteksi kedipan (cek "hidup"). */
   const MATCH=0.5, SAMPLES=3;
   let faces=[], facesSig='', camMode='absen', stream=null, camTimer=null, faceapiP=null, matcher=null;
-  let lastDet=[], samples=[], track=new Map(), camRecent=[], scanBusy=new Set();
+  let lastDet=[], samples=[], track=new Map(), camRecent=[], scanBusy=new Set(), announced=new Map(), loggedSudah=new Set();
   function loadFaceApi(){
     if(faceapiP)return faceapiP;
     faceapiP=new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='vendor/face-api.js';sc.onload=res;sc.onerror=()=>rej(new Error('Library pengenal wajah gagal dimuat.'));document.head.appendChild(sc);})
@@ -671,7 +999,7 @@
       if(m.label==='unknown')return {txt:'Tidak dikenal',col:'#ef4444'};
       const sid=+m.label, s=byId(sid);seen.add(sid);
       const first=s.name.split(' ')[0];
-      if(hadir.has(sid))return {txt:first+' ✓ hadir',col:'#22c55e'};
+      if(hadir.has(sid)){announceSudah(sid,s.name);return {txt:first+' ✓ hadir',col:'#22c55e'};}
       const e=(ear(d.landmarks.getLeftEye())+ear(d.landmarks.getRightEye()))/2;
       const t=track.get(sid)||{hits:0,max:0,closed:false,blink:false,best:1};
       t.hits++;t.best=Math.min(t.best,m.distance);t.max=Math.max(t.max*0.98,e);
@@ -687,18 +1015,33 @@
     scanBusy.add(sid);
     try{
       const r=await authed('hadir_scan',{p_sid:sid,p_jarak:Math.round(d*1000)/1000});
-      hadir.add(sid);
-      camRecent.unshift({t:clock(),m:`${r.name} hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
-      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');renderKamera();
+      hadir.add(sid);announced.set(sid,Date.now());loggedSudah.add(sid);
+      camRecent.unshift({t:clock(),name:r.name,m:`hadir · kecocokan ${Math.round((1-d)*100)}%${r.telat?' · Alpa dibatalkan (terlambat)':''}`});
+      camMsg(`✓ ${r.name} tercatat hadir.`,'ok');camFlash(r.name,r.telat?'hadir · terlambat, Alpa dibatalkan':'hadir');renderKamera();
     }catch(e){camMsg(e.message,'warn');}
     finally{scanBusy.delete(sid);track.delete(sid);}
+  }
+  // Siswa yang SUDAH tercatat hadir hari ini (scan sebelumnya / input lain) tetap diberi tahu,
+  // maksimal sekali per 8 detik per siswa, dan masuk daftar sekali per sesi.
+  function announceSudah(sid,name){
+    const now=Date.now();
+    if(now-(announced.get(sid)||0)<8000)return;
+    announced.set(sid,now);
+    camFlash(name,'sudah tercatat hadir hari ini');
+    if(!loggedSudah.has(sid)){loggedSudah.add(sid);camRecent.unshift({t:clock(),name,m:'sudah tercatat hadir hari ini'});renderKamera();}
+  }
+  // Pemberitahuan besar di atas video: "✓ Bima hadir" (±3 detik) supaya siswa & guru langsung tahu
+  function camFlash(name,sub){
+    const f=$('camFlash');$('camFlashName').textContent=name;$('camFlashSub').textContent=sub;
+    f.hidden=false;f.classList.remove('show');void f.offsetWidth;f.classList.add('show');
+    clearTimeout(camFlash._t);camFlash._t=setTimeout(()=>{f.hidden=true;},3200);
   }
   function renderKamera(){
     $('camKelas').textContent='Kelas '+kelas;
     $('camCount').textContent=`${faces.length} dari ${students.length} wajah terdaftar`;
     $('camHadir').textContent=`Hadir ${hadir.size} dari ${students.length}`;
     $('camAbsenPanel').hidden=camMode!=='absen';$('camDaftarPanel').hidden=camMode!=='daftar';
-    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
+    $('camLog').innerHTML=camRecent.length?camRecent.slice(0,30).map(l=>`<li><time class="mono">${esc(l.t)}</time><span>${l.name?`<b>${esc(l.name)}</b> `:''}${esc(l.m)}</span></li>`).join(''):'<li class="empty">Belum ada yang tercatat di sesi ini.</li>';
     const sel=$('enSiswa'), cur=sel.value, has=new Set(faces.map(f=>f.sid));
     sel.innerHTML=students.map(s=>`<option value="${s.id}">${esc(s.name)}${has.has(s.id)?' (sudah terdaftar)':''}</option>`).join('');
     if(cur&&students.some(s=>String(s.id)===cur))sel.value=cur;
@@ -773,6 +1116,7 @@
     if(view==='verif')renderVerif();
     if(view==='rekap')renderRekap();
     if(view==='users')renderUsers();
+    if(view==='siswa')renderSiswa();
     renderLog();
   }
 

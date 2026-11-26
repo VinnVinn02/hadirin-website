@@ -2,6 +2,82 @@
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/).
 
+## [0.14.0] — 2026-11-26
+### Ditambahkan
+- **Ubah kelas akun guru** (Admin, menu Pengguna): pilih kelas langsung di tabel, atau "Tanpa kelas" untuk melepas.
+  Satu kelas tetap hanya boleh punya satu wali kelas aktif; nama wali kelas yang masih kosong diisi otomatis;
+  akun yang diubah diminta login ulang. Migrasi `20261126020000_ubah-kelas-guru.sql` (RPC `user_kelas_set`).
+
+### Diubah
+- Data contoh di database produksi dihapus (siswa, kelas, laporan, kehadiran, wajah, log); data contoh harian dimatikan.
+  Akun login dipertahankan.
+
+## [0.13.0] — 2026-11-26
+### Ditambahkan
+- **🔍 Cari siswa** (tombol di header, semua peran; guru hanya kelasnya sendiri): cari dengan NIS atau nama.
+- **Detail siswa**: data diri, status data wajah (tanggal & persetujuan), rekap 30 hari (hadir/sakit/izin/alpa),
+  kalender kehadiran, galeri foto surat/lampiran, dan riwayat laporan. Bisa juga dibuka dengan klik nama di menu Data siswa.
+- Setiap pembukaan detail siswa dicatat di log audit (khusus admin) — data pribadi, UU PDP.
+- Migrasi `20261126010000_detail-siswa.sql`: RPC `siswa_cari`, `siswa_detail`.
+- Catatan: Hadirin tetap tidak menyimpan foto wajah; "foto" di detail siswa adalah lampiran surat.
+
+## [0.12.0] — 2026-11-26
+### Ditambahkan
+- **Menu Data siswa** (Admin + TU): tambah, ubah, hapus siswa (NIS, nama, kelas, no. WA ortu), cari per kelas,
+  status pendaftaran wajah.
+- **Impor dari Excel (CSV)**: template unduhan, pemisah `;`/`,` dideteksi otomatis, NIS yang sudah ada diperbarui (tidak dobel),
+  opsi membuat kelas baru otomatis, baris yang salah dilewati dan dilaporkan.
+- **Kelola kelas**: tambah kelas, ubah nama wali kelas, hapus kelas kosong. Pilihan kelas di form akun guru kini diambil dari database.
+- **Saklar data contoh harian** (Admin): matikan supaya kehadiran tidak lagi diisi otomatis, dengan opsi mengosongkan kehadiran hari ini.
+- **Pratinjau lampiran** di dalam halaman: foto surat langsung tampil, PDF bisa dibuka/diunduh.
+  Lampiran data contoh ditandai "contoh, tanpa file".
+- Migrasi `20261126000000_data-siswa.sql`: RPC `siswa_list`, `siswa_simpan`, `siswa_hapus`, `siswa_impor`,
+  `kelas_simpan`, `kelas_hapus`, `data_contoh_set`; tabel `pengaturan`.
+
+## [0.11.0] — 2026-11-26
+### Ditambahkan
+- **Halaman depan publik** di `/` (`public/index.html`): satu H1, meta description, canonical, Open Graph + Twitter Card,
+  gambar pratinjau 1200×630 (`assets/og-image.png`, dibuat ulang dengan `node deploy/make-og.js`),
+  JSON-LD (Organization, WebSite, SoftwareApplication, FAQPage), bagian cara kerja, fitur, keamanan data, tanya jawab, dan kontak.
+- `robots.txt` dan `sitemap.xml`.
+- Build menolak jalan selama halaman depan masih berisi `GANTI:` (tes lokal: `HADIRIN_DRAFT=1`).
+  Bagian kontak sementara diganti tombol "Mulai memakai Hadirin" sampai data kontak asli tersedia.
+
+- **Kamera kelas:** setiap siswa yang tercatat hadir memunculkan pemberitahuan besar di atas video, misalnya "✓ Bima Saputra hadir" (±3 detik).
+  Nama siswa di daftar "Hadir lewat kamera" ditebalkan.
+  Siswa yang sudah tercatat hadir hari ini juga diberi tahu ("✓ Bima · sudah tercatat hadir hari ini"), maksimal sekali per 8 detik.
+
+### Diperbaiki
+- Teks "Belum ada yang tercatat di sesi ini" di panel kamera tidak lagi terpotong satu kata per baris.
+
+### Diubah
+- Aplikasi pindah ke `/app` (`public/app.html`). Link lama `/#lapor`, `/#lapor?k=…`, dan `/#cek` diteruskan otomatis ke `/app`.
+- `X-Robots-Tag: noindex` sekarang hanya untuk `/app`, `/models`, dan `/vendor`; halaman depan boleh diindeks (Vercel dan Nginx).
+
+## [0.10.0] — 2026-11-19
+### Ditambahkan
+- Enkripsi descriptor wajah saat disimpan: AES-256 (pgcrypto) dengan kunci di Supabase Vault.
+  Enkripsi/dekripsi terjadi di server, sehingga kode front-end tidak berubah.
+
+## [0.9.0] — 2026-11-19
+### Diubah
+- Ambang kecocokan wajah diseragamkan: server menolak jarak > 0.5 (sebelumnya 0.6) dan nilai NaN.
+
+### Ditambahkan
+- Validasi *magic bytes* lampiran di server — isi file harus benar-benar JPG/PNG/WEBP/PDF, bukan sekadar MIME/ekstensi palsu.
+- Fungsi retensi & penghapusan data (UU PDP): `siswa_hapus_data`, `retensi_bersihkan`, `hapus_lampiran_yatim`.
+- Pengujian SQL di `supabase/tests/` (`01_hardening_test.sql`, `02_enkripsi_test.sql`).
+
+## [0.7.0] — 2026-11-18
+### Ditambahkan
+- Tombol **💬 WA ortu** (lewat `wa.me`): membuka WhatsApp di perangkat guru dengan pesan yang sudah terisi, guru tinggal menekan Kirim
+  - Ada di form laporan (saat siswa dipilih dari antrean), tabel laporan hari ini, dan daftar "Perlu perhatian"
+  - Pesan menyesuaikan keadaan: belum ada kabar (plus link form orang tua), Alpa, konfirmasi Sakit/Izin, dan rekap kehadiran
+  - Pesan menyertakan total **hari** tidak masuk dalam 30 hari terakhir (minimal 2 hari)
+- Nomor WA orang tua per siswa (`siswa.hp_ortu`), diisi lewat tombol **＋ No. WA**. Guru hanya bisa melihat dan mengubah nomor siswa di kelasnya sendiri
+- Setiap pembukaan WA dan perubahan nomor dicatat di log audit
+- Migrasi `20261118020000_wa-ortu.sql`: RPC `kontak_ortu`, `hp_ortu_set`, `wa_catat`
+
 ## [0.6.1] — 2026-11-18
 ### Diubah
 - Pendaftaran wajah: cukup 1 klik "Ambil sampel otomatis", 3 sampel diambil sendiri dalam ±3 detik (sebelumnya 5 klik)
